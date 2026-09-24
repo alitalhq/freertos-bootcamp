@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# STM32CubeIDE / build çıktıları
+**/Debug/
+**/Release/
+**/build/
+*.o
+*.d
+*.su
+*.map
+*.list
+*.elf
+*.bin
+*.hex
+.metadata/
+*.launch
+
+# Python
+__pycache__/
+*.pyc
+.venv/
