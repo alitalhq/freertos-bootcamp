@@ -20,3 +20,6 @@
 __pycache__/
 *.pyc
 .venv/
+
+# Test fixture: gerçek UART çıktısı (firmware binary değil)
+!hafta-01/interface/tests/fixtures/*.bin
