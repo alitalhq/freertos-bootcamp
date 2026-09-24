@@ -386,3 +386,20 @@ Sıralama bağımlılığı: F0 → F1 → F2 → F3 → F4 → F5 → F6 → F7
 | 1 | Geliştirme ortamı: **STM32CubeIDE** (CubeMX, derleyici, ST-LINK ve debugger tek pakette) | ✅ 24.09.2026 |
 | 2 | GitHub deposu: `freertos-bootcamp`, **public** | ✅ 24.09.2026 |
 | 3 | PC'den UART RX ile senaryo seçme/başlatma (opsiyonel, ödev zorunlu tutmuyor) | ⏳ Zaman kalırsa yapılır |
+
+### Dil kuralları
+
+| Alan | Dil |
+|---|---|
+| Kod: tanımlayıcılar, dosya adları, log/mesaj metinleri | İngilizce |
+| Kod yorumları | Türkçe |
+| Dokümantasyon: README, docs/, rapor, ADR | Türkçe |
+| Commit mesajları, branch adları, PR/issue başlıkları | İngilizce |
+
+### Mimari karar kayıtları (ADR)
+
+| ADR | Karar | Durum |
+|---|---|---|
+| [ADR-001](adr/ADR-001-uart-gonderim-yontemi.md) | UART gönderimi interrupt (IT) ile, t₄ TC callback'inde | Kabul edildi |
+| [ADR-002](adr/ADR-002-mikrosaniye-zaman-kaynagi.md) | µs zaman kaynağı TIM2, 32-bit, 1 MHz | Kabul edildi |
+| [ADR-003](adr/ADR-003-deney-kontrolu-ve-export.md) | Senaryo derleme zamanında seçiliyor, deney otomatik bitiyor, export'u UartTxTask yapıyor | Kabul edildi |
