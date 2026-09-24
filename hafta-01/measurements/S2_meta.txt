@@ -1,0 +1,14 @@
+CFG,scenario=S2,sysclk_hz=80000000,tick_hz=1000,timer_hz=1000000,baud=115200,freertos=V10.3.1,opt=O0
+CFG,period_ms=20,work_us=0,target_events=35,warmup_ms=5000,debounce_us=30000,deadline_us=20000
+CFG,msg_len=64,txq_len=16,btnq_len=8
+CFG,calib_iters=10000,calib_us=3884,work_iters=0
+TSK,uart_tx,prio=1,stack_hwm_words=169
+TSK,IDLE,prio=0,stack_hwm_words=95
+TSK,button,prio=2,stack_hwm_words=176
+TSK,telemetry,prio=3,stack_hwm_words=184
+TSK,Tmr Svc,prio=2,stack_hwm_words=214
+CNT,accepted=35,bounce_rejected=0,ignored=0,btn_q_drop=0,buttonq_hwm=1,rec_overflow=0
+CNT,tel_sent=3744,tel_tx_drop=0,btn_tx_drop=0,msg_overflow=0,txq_hwm=1
+CNT,uart_tx_ok=3825,uart_start_err=0,uart_error=0,uart_timeout=0,free_heap=14560
+CNT,period_n=3743,period_min_us=19993,period_avg_us=19999,period_max_us=20004,work_n=0
+END
