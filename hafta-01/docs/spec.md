@@ -386,6 +386,7 @@ Sıralama bağımlılığı: F0 → F1 → F2 → F3 → F4 → F5 → F6 → F7
 | 1 | Geliştirme ortamı: **STM32CubeIDE** (CubeMX, derleyici, ST-LINK ve debugger tek pakette) | ✅ 24.09.2026 |
 | 2 | GitHub deposu: `freertos-bootcamp`, **public** | ✅ 24.09.2026 |
 | 3 | PC'den UART RX ile senaryo seçme/başlatma (opsiyonel, ödev zorunlu tutmuyor) | ⏳ Zaman kalırsa yapılır |
+| 4 | S5'te gözlenen birikimli gecikme için çözüm denemeleri (öncelik, TC'den zincirleme gönderim, BTN önceliği vb.). Zorunlu S0–S5 standart ayarlarla bittikten **sonra** tartışılır, "standart dışı" etiketli ek deney olarak uygulanır ve README'de sapma gerekçesiyle açıklanır | ⏳ F9 sonrası |
 
 ### Dil kuralları
 
