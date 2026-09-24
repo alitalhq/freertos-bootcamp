@@ -24,11 +24,18 @@ typedef struct {
     volatile uint32_t uart_start_err; /* UartTxTask: HAL_UART_Transmit_IT != HAL_OK */
     volatile uint32_t uart_error;     /* USART2 ISR: ErrorCallback */
     volatile uint32_t uart_timeout;   /* UartTxTask: 1 s içinde TC gelmedi */
+    /* TelemetryTask zamanlaması (yalnızca TelemetryTask yazar) */
+    uint32_t period_min_us, period_max_us, period_sum_us, period_n;
+    uint32_t work_min_us, work_max_us, work_sum_us, work_n;
 } Stats;
 
 extern Stats g_stats;
 
 /* Birden çok görevin güncellediği maksimumlar için (kritik bölgede). */
 void stats_update_max(volatile uint32_t *field, uint32_t value);
+
+/* TelemetryTask: gözlenen aktivasyon periyodu ve kalibre iş süresi (µs). */
+void stats_period_sample(uint32_t us);
+void stats_work_sample(uint32_t us);
 
 #endif /* STATS_H */

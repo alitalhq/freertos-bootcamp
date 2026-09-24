@@ -36,4 +36,9 @@
 #define REC_POOL_SIZE          128U    /* ödev en az 64 istiyor */
 #define DEADLINE_US            20000U  /* R = t4 - t0 <= 20 ms (yalnızca raporlama) */
 
+/* Yalnızca geliştirme testi: tanımlanırsa deney buton beklemeden bu kadar
+   ms sonra biter ve export yapılır (telemetri/yük doğrulaması için).
+   Ölçüm derlemelerinde TANIMLI OLMAMALI. */
+/* #define TEST_AUTO_STOP_MS   10000U */
+
 #endif /* APP_CONFIG_H */

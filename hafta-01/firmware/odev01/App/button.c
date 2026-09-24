@@ -101,6 +101,13 @@ static void ButtonTask(void *arg)
     g_exp_state = EXP_RUNNING;
     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
 
+#ifdef TEST_AUTO_STOP_MS
+    vTaskDelay(pdMS_TO_TICKS(TEST_AUTO_STOP_MS));
+    g_exp_state = EXP_STOPPING;
+    post_export_marker();
+    vTaskSuspend(NULL);
+#endif
+
     for (;;)
     {
         xQueueReceive(s_button_q, &e, portMAX_DELAY);

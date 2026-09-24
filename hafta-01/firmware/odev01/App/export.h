@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define EXPORT_LINE_MAX  128   /* 64 baytlık mesajlardan uzun olabilir */
+#define EXPORT_LINE_MAX  192   /* 64 baytlık mesajlardan uzun olabilir */
 
 /* Deney sonu: CFG, REC x N, TSK, CNT ve END satırlarını gönderir
    (spec §3.4, §8). Yalnızca UartTxTask bağlamından çağrılır. */

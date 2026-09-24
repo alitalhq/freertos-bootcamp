@@ -5,6 +5,8 @@
 #include "stats.h"
 #include "uart_tx.h"
 #include "experiment.h"
+#include "timebase.h"
+#include "workload.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -23,7 +25,9 @@ static void TelemetryTask(void *arg)
     const TickType_t period = pdMS_TO_TICKS(sc->period_ms);
     configASSERT(period > 0U);
 
+    const uint32_t iters = workload_calib()->work_iters;
     uint32_t seq = 0;
+    uint32_t prev_act = 0;
     TickType_t last = xTaskGetTickCount();
 
     for (;;)
@@ -34,7 +38,20 @@ static void TelemetryTask(void *arg)
             vTaskSuspend(NULL);
         }
 
-        /* Kalibre CPU işi F5'te buraya eklenecek (S4/S5). */
+        /* Gerçek aktivasyon periyodu: planlanan değil, gözlenen (spec §7.1). */
+        const uint32_t act = timer_us();
+        if (seq > 0U)
+        {
+            stats_period_sample(act - prev_act);
+        }
+        prev_act = act;
+
+        /* S4/S5: kalibre CPU işi. Süre duvar saatidir; kesme süresi dahil. */
+        if (iters > 0U)
+        {
+            workload_run(iters);
+            stats_work_sample(timer_us() - act);
+        }
 
         TxMsg m;
         TextBuilder b;

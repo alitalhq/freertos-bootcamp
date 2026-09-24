@@ -4,6 +4,7 @@
 #include "records.h"
 #include "stats.h"
 #include "msg.h"
+#include "workload.h"
 
 #include "main.h"
 #include "FreeRTOS.h"
@@ -58,9 +59,19 @@ static void export_cfg(void)
     kv(&b, "warmup_ms", WARMUP_MS);
     kv(&b, "debounce_us", DEBOUNCE_US);
     kv(&b, "deadline_us", DEADLINE_US);
+    send(&b);
+
+    begin(&b, "CFG");
     kv(&b, "msg_len", MSG_LEN);
     kv(&b, "txq_len", TX_QUEUE_LEN);
     kv(&b, "btnq_len", BUTTON_QUEUE_LEN);
+    send(&b);
+
+    const WorkloadCalib *wc = workload_calib();
+    begin(&b, "CFG");
+    kv(&b, "calib_iters", wc->calib_iters);
+    kv(&b, "calib_us", wc->calib_us);
+    kv(&b, "work_iters", wc->work_iters);
     send(&b);
 }
 
@@ -139,6 +150,24 @@ static void export_counters(void)
     kv(&b, "uart_error", g_stats.uart_error);
     kv(&b, "uart_timeout", g_stats.uart_timeout);
     kv(&b, "free_heap", (uint32_t)xPortGetMinimumEverFreeHeapSize());
+    send(&b);
+
+    /* Gözlenen telemetri periyodu ve iş süresi. n=0 ise min/max anlamsız. */
+    begin(&b, "CNT");
+    kv(&b, "period_n", g_stats.period_n);
+    if (g_stats.period_n > 0U)
+    {
+        kv(&b, "period_min_us", g_stats.period_min_us);
+        kv(&b, "period_avg_us", g_stats.period_sum_us / g_stats.period_n);
+        kv(&b, "period_max_us", g_stats.period_max_us);
+    }
+    kv(&b, "work_n", g_stats.work_n);
+    if (g_stats.work_n > 0U)
+    {
+        kv(&b, "work_min_us", g_stats.work_min_us);
+        kv(&b, "work_avg_us", g_stats.work_sum_us / g_stats.work_n);
+        kv(&b, "work_max_us", g_stats.work_max_us);
+    }
     send(&b);
 }
 
