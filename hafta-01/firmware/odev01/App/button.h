@@ -12,4 +12,8 @@ typedef struct {
 /* buttonQ'yu ve ButtonTask'ı oluşturur (öncelik 2). */
 void button_create(void);
 
+/* stm32l4xx_it.c -> EXTI15_10_IRQHandler'ın İLK satırı (USER CODE 0).
+   t0'ı HAL'in bayrak temizleme ve dağıtım kodundan önce yakalar (R-BTN-2). */
+void button_irq_entry(void);
+
 #endif /* BUTTON_H */

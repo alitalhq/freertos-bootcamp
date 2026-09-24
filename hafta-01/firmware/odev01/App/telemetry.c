@@ -4,6 +4,7 @@
 #include "msg.h"
 #include "stats.h"
 #include "uart_tx.h"
+#include "experiment.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -27,17 +28,23 @@ static void TelemetryTask(void *arg)
 
     for (;;)
     {
+        /* Deney bitti: telemetriyi durdur ki txQ boşalıp export başlasın. */
+        if (g_exp_state >= EXP_STOPPING)
+        {
+            vTaskSuspend(NULL);
+        }
+
         /* Kalibre CPU işi F5'te buraya eklenecek (S4/S5). */
 
         TxMsg m;
-        MsgBuilder b;
+        TextBuilder b;
         msg_begin(&b, &m, MSG_TEL, seq);
-        msg_put_str(&b, "TEL,");
-        msg_put_u32(&b, seq);
-        msg_put_str(&b, ",");
-        msg_put_str(&b, sc->name);
-        msg_put_str(&b, ",");
-        msg_put_u32(&b, (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS));
+        tb_put_str(&b, "TEL,");
+        tb_put_u32(&b, seq);
+        tb_put_str(&b, ",");
+        tb_put_str(&b, sc->name);
+        tb_put_str(&b, ",");
+        tb_put_u32(&b, (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS));
         if (!msg_finish(&b))
         {
             g_stats.msg_overflow++;

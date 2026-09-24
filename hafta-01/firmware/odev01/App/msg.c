@@ -3,28 +3,27 @@
 
 #define MSG_TEXT_MAX (MSG_LEN - 1)   /* son bayt LF'e ayrılmış */
 
-void msg_begin(MsgBuilder *b, TxMsg *m, MsgType type, uint32_t event_id)
+void tb_init(TextBuilder *b, char *buf, uint32_t cap)
 {
-    m->type = (uint8_t)type;
-    m->event_id = event_id;
-    b->m = m;
+    b->buf = buf;
+    b->cap = cap;
     b->len = 0;
     b->overflow = false;
 }
 
-static void put_char(MsgBuilder *b, char c)
+static void put_char(TextBuilder *b, char c)
 {
-    if (b->len < MSG_TEXT_MAX)
+    if (b->len < b->cap)
     {
-        b->m->data[b->len++] = c;
+        b->buf[b->len++] = c;
     }
     else
     {
-        b->overflow = true;   /* sessizce kesme yok: finish false döner */
+        b->overflow = true;   /* sessizce kesme yok: çağıran kontrol eder */
     }
 }
 
-void msg_put_str(MsgBuilder *b, const char *s)
+void tb_put_str(TextBuilder *b, const char *s)
 {
     while (*s != '\0')
     {
@@ -32,7 +31,7 @@ void msg_put_str(MsgBuilder *b, const char *s)
     }
 }
 
-void msg_put_u32(MsgBuilder *b, uint32_t v)
+void tb_put_u32(TextBuilder *b, uint32_t v)
 {
     char tmp[10];              /* 2^32-1 en fazla 10 hane */
     int n = 0;
@@ -47,9 +46,16 @@ void msg_put_u32(MsgBuilder *b, uint32_t v)
     }
 }
 
-bool msg_finish(MsgBuilder *b)
+void msg_begin(TextBuilder *b, TxMsg *m, MsgType type, uint32_t event_id)
 {
-    memset(&b->m->data[b->len], ' ', MSG_TEXT_MAX - b->len);
-    b->m->data[MSG_LEN - 1] = '\n';
+    m->type = (uint8_t)type;
+    m->event_id = event_id;
+    tb_init(b, m->data, MSG_TEXT_MAX);
+}
+
+bool msg_finish(TextBuilder *b)
+{
+    memset(&b->buf[b->len], ' ', MSG_TEXT_MAX - b->len);
+    b->buf[MSG_LEN - 1] = '\n';
     return !b->overflow;
 }

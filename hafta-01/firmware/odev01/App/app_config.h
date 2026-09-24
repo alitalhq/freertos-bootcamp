@@ -27,4 +27,13 @@
 /* ---- UART gönderim gözetimi (spec §4) --------------------------------- */
 #define UART_TX_TIMEOUT_MS     1000    /* deney timeout'u; 20 ms deadline ile karıştırma */
 
+/* ---- Buton ve deney akışı (spec §5, §8, ADR-003) ---------------------- */
+#define DEBOUNCE_US            30000U  /* son kabul edilen kenardan sonra 30 ms */
+#define WARMUP_MS              5000U   /* ısınma: basışlar yok sayılır, LD2 sönük */
+#ifndef TARGET_EVENTS
+#define TARGET_EVENTS          35U     /* bu kadar kabul edilen basıştan sonra export */
+#endif
+#define REC_POOL_SIZE          128U    /* ödev en az 64 istiyor */
+#define DEADLINE_US            20000U  /* R = t4 - t0 <= 20 ms (yalnızca raporlama) */
+
 #endif /* APP_CONFIG_H */
