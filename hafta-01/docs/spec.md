@@ -35,7 +35,7 @@ açıklamamız. Kartlar arasında mutlak süre yarışı yapılmıyor.
 | Buton | B1 (USER), **PC13**, aktif düşük | Basış = **düşen kenar** → EXTI15_10 |
 | UART | **USART2**, PA2 (TX) / PA3 (RX) | ST-LINK Sanal COM Portu (VCP), ek kablo gerekmez |
 | LED | LD2, **PA5** | Durum göstergesi (ısınma/hazır/export) |
-| Sistem saati | **80 MHz** (MSI 4 MHz → PLL) | Raporlanacak |
+| Sistem saati | **80 MHz** (HSI16 → PLL: M=1, N=10, R=2) | CubeMX varsayılanı. Raporlanacak |
 | µs zaman kaynağı | **TIM2** (32-bit), PSC=79 → **1 MHz**, ARR=0xFFFFFFFF, serbest sayım | Çözünürlük 1 µs. ~71,6 dakikada bir tur atar |
 | RTOS tick | **SysTick**, `configTICK_RATE_HZ = 1000` | |
 | HAL timebase | **TIM6** | SysTick'i FreeRTOS kullandığı için HAL'e ayrı timer gerekir (CubeMX de bunu uyarır) |
@@ -61,7 +61,7 @@ birbirinden **asla çıkarılmaz**.
 - **R-TSK-3:** CubeMX'in otomatik ürettiği `defaultTask` **silinir**. CMSIS-RTOS v2 kullanılırsa onun önceliği
   (osPriorityNormal=24) bizim görevlerimizin üstünde kalır ve ölçümü bozar. Görevleri native API ile
   (`xTaskCreate`) 1/2/3 öncelikleriyle oluşturuyoruz.
-- **R-TSK-4:** Timer servis görevi (`configUSE_TIMERS`) kullanılmıyorsa kapatılır. Açık kalırsa önceliği raporda belirtilir.
+- **R-TSK-4:** CMSIS_V2 arayüzü `USE_TIMERS`'ı zorunlu açık tutuyor (`cmsis_os2.c` `xTimerPendFunctionCall`'a ihtiyaç duyuyor), bu yüzden kapatılamıyor. Timer servis görevi (varsayılan öncelik 2) yazılım timer'ı kullanmadığımız için sürekli blokta kalır ve CPU almaz. Önceliği ve bu durum README'de raporlanır.
 - **R-TSK-5:** `xTaskCreate` ve `xQueueCreate` dönüş değerleri kontrol edilir. Hata olursa `Error_Handler`'a gidilir.
 - **R-TSK-6:** `configASSERT`, `configCHECK_FOR_STACK_OVERFLOW=2` ve `vApplicationMallocFailedHook` açık olur.
 
@@ -309,8 +309,8 @@ CubeMX'in ürettiği kod (`Core/`, `Drivers/`, `Middlewares/`) yeniden üretilin
 uygulama kodu ayrı bir `App/` klasöründe durur:
 
 ```
-firmware/
-├── <CubeIDE projesi: .ioc, Core/, Drivers/, Middlewares/FreeRTOS, FreeRTOSConfig.h>
+firmware/odev01/            CubeMX (STM32CubeIDE toolchain) ile üretilen proje
+├── odev01.ioc, Core/, Drivers/, Middlewares/FreeRTOS  (CubeMX üretir)
 └── App/
     ├── app_config.h        SCENARIO, periyotlar, TARGET_EVENTS, REC_POOL_SIZE, eşikler
     ├── app.c / app.h       app_init(): kalibrasyon, kuyruklar, görevler; ISR/callback köprüleri
