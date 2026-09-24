@@ -51,7 +51,7 @@ birbirinden **asla çıkarılmaz**.
 
 | Görev | FreeRTOS önceliği | Sorumluluk | Bloklandığı yer |
 |---|---|---|---|
-| `TelemetryTask` | **3** (yüksek) | Periyodik TEL mesajı üretir, gerekirse kalibre CPU işi yapar, `txQ`'ya bırakır | `xTaskDelayUntil` (S0'da süresiz bekleme) |
+| `TelemetryTask` | **3** (yüksek) | Periyodik TEL mesajı üretir, gerekirse kalibre CPU işi yapar, `txQ`'ya bırakır | `vTaskDelayUntil` (S0'da süresiz bekleme) |
 | `ButtonTask` | **2** (orta) | `buttonQ`'dan olayı alır, BTN yanıtını üretir, `txQ`'ya bırakır | `xQueueReceive(buttonQ, portMAX_DELAY)` |
 | `UartTxTask` | **1** (düşük) | UART'ın **tek sahibi**. `txQ`'yu FIFO sırasıyla tüketir, IT ile gönderir, TC'yi bekler | `xQueueReceive(txQ)` + `ulTaskNotifyTake` |
 | Idle | 0 | Sayıya dahil değil | |
@@ -225,7 +225,7 @@ typedef struct {
   Her senaryo için yeniden derleyip yüklüyoruz. (Opsiyonel geliştirme: PC'den UART RX komutuyla seçim.)
 - **R-SCN-2:** S0'da `TelemetryTask` **bloklanır** (`vTaskSuspend(NULL)` ya da süresiz notify bekleme).
   Boş döngüde dönmez.
-- **R-SCN-3:** Periyot `xTaskDelayUntil` ile tutulur. Tick'e tam bölünür (1 kHz tick → 100/20/10 tick).
+- **R-SCN-3:** Periyot `vTaskDelayUntil` ile tutulur (CubeMX paketi FreeRTOS 10.3.1 getiriyor; `xTaskDelayUntil` 10.4 ile geldi, davranış aynı). Tick'e tam bölünür (1 kHz tick → 100/20/10 tick).
   Gerçek periyot (ardışık aktivasyonlar arası µs) min/ortalama/max olarak ölçülüp raporlanır.
 
 ### 7.2 Kalibre CPU işi (S4, S5)
@@ -338,7 +338,7 @@ firmware/odev01/            CubeMX (STM32CubeIDE toolchain) ile üretilen proje
 | **F2** FreeRTOS iskeleti | FreeRTOS etkin, TIM6 HAL timebase, defaultTask silinmiş, 3 görev + 2 kuyruk, hook'lar | Scheduler çalışıyor, assert/overflow yok |
 | **F3** UART sahibi | UartTxTask + IT + TC notify + timeout + 64 baytlık mesajlar | Test mesajları PC'ye tam 64 bayt ve kayıpsız ulaşıyor |
 | **F4** Buton yolu | EXTI ISR, 30 ms filtre, kayıt havuzu, ButtonTask, t0…t4 | S0'da her basış 1 BTN mesajı üretiyor, kayıtlarda t0<t1<t2<t3<t4 |
-| **F5** Yük | TelemetryTask, xTaskDelayUntil, kalibre iş, senaryo seçimi | Ölçülen periyot ve iş süresi hedefe yakın, CFG'de raporlanıyor |
+| **F5** Yük | TelemetryTask, vTaskDelayUntil, kalibre iş, senaryo seçimi | Ölçülen periyot ve iş süresi hedefe yakın, CFG'de raporlanıyor |
 | **F6** Export | Deney sonu akışı, CFG/REC/CNT/END | Export satırları eksiksiz ve ayrıştırılabilir |
 | **F7** PC arayüzü | Tkinter + pyserial + CSV + canlı grafik | UI-1…UI-7 sağlanıyor |
 | **F8** Deneyler | S0–S5, her birinde ≥30 kabul edilen olay | 6 CSV + meta dosyaları (toplam ≥180 olay) |
