@@ -1,57 +1,41 @@
 # Yapay Zekâ Kullanımı
 
-Ödevde yapay zekâ kullanımı serbest. Bu belge, hangi işlerde destek alındığını, üretilen içeriğin nasıl doğrulandığını ve nelerin değiştirildiğini anlatıyor.
-
-**Kullanılan araç:** Claude (Claude Code, terminal üzerinden).
+**Araç:** Claude (Claude Code)
 
 ## Hangi işlerde destek alındı?
 
-| Alan | Yapay zekânın yaptığı | Benim yaptığım |
+- Ödev metninin numaralı gereksinimlere ([spec.md](spec.md)) ve karar kayıtlarına (ADR) dönüştürülmesi
+- CubeMX yapılandırması ve firmware kodu (`App/`)
+- PC arayüzü, protokol ayrıştırma ve testler (`interface/`)
+- Analiz betiği, grafikler ve rapor taslağı
+- Hata analizi: S5'teki birikimli gecikmenin kök nedeni ve çözüm denemeleri
+- README ve doküman taslakları
+
+## Üretilen kod ve sonuçlar nasıl kontrol edildi?
+
+Hiçbir kod ya da iddia doğrudan kabul edilmedi. Her adım kartta ya da ham veriyle sınandı:
+
+- **Donanım:** SYSCLK 80 MHz ve TIM2 1 MHz UART çıktısında görüldü. `HAL_Delay(1000)` TIM2 ile ~1 000 367 µs ölçüldü.
+- **UART:** 100 Hz'de her mesajın tam 64 bayt olduğu ve sıra numaralarında boşluk olmadığı kontrol edildi. Ölçülen hat kullanımı (%55,6) hesapla birebir tuttu.
+- **Ölçüm zinciri:** Her kayıtta t₀ < t₁ < t₂ < t₃ < t₄ sırası kontrol edildi. t₄−t₃ = 5 560 µs, hesaplanan hat süresine (5 556 µs) uyuyor.
+- **Arayüz:** Protokol kodu gerçek kart çıktısıyla test edildi. Veri farklı parça boyutlarında verildiğinde de aynı sonucu verdi. Arayüz kartla canlı denendi.
+- **Rapor:** Rapordaki sayılar ham CSV'den yeniden hesaplanıp karşılaştırıldı.
+
+## Hangi öneriler değiştirildi, neden?
+
+Kontroller sırasında birkaç öneri ya da iddia yanlış çıktı ve düzeltildi:
+
+| Öneri / iddia | Neden yanlıştı | Sonuç |
 |---|---|---|
-| Şartname | Ödev metnini numaralı gereksinimlere (spec.md) ve fazlara dönüştürdü, 3 ADR yazdı | Gözden geçirdim, kararları onayladım (IDE, depo, dil kuralları) |
-| CubeMX kurulumu | Hangi ayarın nerede yapılacağını adım adım anlattı, üretilen `.ioc` ve kodu dosyadan kontrol etti | Tüm ayarları CubeMX'te kendim yaptım |
-| Firmware | `App/` altındaki kodun taslağını yazdı ve komut satırından derleyip karta yükledi | Her fazda karttaki davranışı gözledim, butona bastım |
-| PC arayüzü | `protocol.py`, `monitor.py` ve testleri yazdı | Arayüzü kartla canlı test ettim |
-| Ölçüm | Her senaryoyu derleyip yükledi, UART'ı dinleyip CSV'ye kaydetti | 6 × 35 basışı yaptım |
-| Analiz | `analyze.py`, grafikler ve rapor taslağı | _(doldurulacak)_ |
-| Dokümantasyon | README, setup, code-notes taslakları | _(doldurulacak)_ |
-| Lab modu ve çözümler (standart dışı) | Kök neden analizi, çözüm varyantları (`#ifdef`), UART komut kanalı, otomatik basış, `lab_app.py` arayüzü; varyantları kartta ölçtü | İsterleri belirledim: kendi deney ayarları, elle/otomatik seçimi, çözümlerin `#ifdef` ile ayrılması |
+| CubeMX'te `USE_TIMERS` kapatılsın | CMSIS_V2 bu ayarı zorunlu açık tutuyor | Açık bırakıldı |
+| Kart varsayılanlarıyla başlamak yeterli | BSP buton kesmesini yükselen kenara kuruyor ve önceliğini eziyordu | BSP kapatıldı, pinler elle ayarlandı |
+| `xTaskDelayUntil` kullanılsın | FreeRTOS 10.3.1'de yok, derleme hatası verdi | `vTaskDelayUntil` kullanıldı |
+| Export satırı için 128 bayt yeter | S5'te 130 baytlık satır export'u durdurdu | Satır bölündü, tampon 192 bayta çıkarıldı |
+| "7 başarılı yanıt = 7 kayıp telemetri" | Veriyle karşılaştırıldığında 7'den yalnızca 6'sı açıklanıyordu | Rapora "6'sı açıklanıyor, 1'i bilinmiyor" olarak yazıldı |
+| "UART önceliğini yükseltmek telemetriyi etkilemez" | Ölçüm: iş süresi +36 µs, periyot sapması ±110 µs | Bedel ölçülen değerlerle yazıldı |
+| Rapordaki bazı sayılar | Ham veriden yeniden sayıldığında farklı çıktı | Düzeltildi |
 
-## Üretilen içerik nasıl doğrulandı?
-
-Kod ya da iddia, kabul edilmeden önce kartta veya veriyle sınandı:
-
-- **Donanım adımları (F0/F1):** SYSCLK = 80 MHz ve TIM2 1 MHz, UART çıktısında görüldü. `HAL_Delay(1000)` TIM2 ile ~1 000 367 µs ölçüldü.
-- **UART sahibi (F3):** S1 ve S3'te 10 s'lik akışta her TEL satırının tam 64 bayt olduğu ve sıra numaralarında boşluk olmadığı kontrol edildi. S3'te ölçülen hat kullanımı 6 406 B/s ÷ 11 520 B/s = %55,6, hesapla birebir.
-- **Ölçüm zinciri (F4):** 5 basışlık testte her kayıtta t₀ < t₁ < t₂ < t₃ < t₄. t₄−t₃ = 5 560 µs, hesaplanan 5 556 µs'ye uyuyor.
-- **Yük (F5):** Butonsuz otomatik testte iş süresi (2 011 / 5 049 µs) ve periyot (9 993–10 002 µs) ölçüldü.
-- **Arayüz (F7):** Protokol kodu gerçek kart çıktısıyla test edildi. Veri 1, 7, 64 ve 4096 baytlık parçalar halinde verildiğinde aynı sonuç çıktı. Arayüz kartla canlı denendi.
-- **Rapor (F9):** Rapordaki sayılar ham CSV'den yeniden hesaplanıp karşılaştırıldı.
-
-## Yapay zekânın hataları ve yapılan düzeltmeler
-
-Süreçte yapay zekânın önerileri ya da iddiaları birkaç kez yanlış çıktı. Hepsi test ya da veriyle yakalandı:
-
-| Hata | Nasıl yakalandı | Düzeltme |
-|---|---|---|
-| CubeMX'te `USE_TIMERS`'ın kapatılmasını önerdi | Ayar CubeMX'te gri, değiştirilemiyordu (CMSIS_V2 zorunlu tutuyor) | Açık bırakıldı, spec R-TSK-4 güncellendi |
-| "Initialize peripherals: Yes" demenin yeterli olacağını varsaydı | Üretilen kodda PC13 **yükselen** kenardaydı ve BSP EXTI önceliğini 15'e eziyordu | BSP kapatıldı, pinler elle ayarlandı |
-| FreeRTOS'un `xTaskDelayUntil` sağladığını varsaydı | Derleme hatası: FreeRTOS 10.3.1'de yok | `vTaskDelayUntil` kullanıldı |
-| Export satır tamponunu 128 bayt seçti | S5 testinde export yarıda kaldı: satır 130 bayttı, `configASSERT` durdurdu | Satır bölündü, tampon 192 bayta çıkarıldı |
-| Bir testin beklentisini yanlış yazdı (fixture'da 1 BTN var dedi, 2 vardı) | Test başarısız oldu, veriye bakıldı | Test düzeltildi (kod doğruydu) |
-| S5 için "7 başarılı BTN = 7 kayıp TEL" dedi | Veriyle kontrol: olay 34 telemetri durduktan sonra geldi | Raporda "7'nin 6'sı açıklanıyor, 1'i bilinmiyor" olarak düzeltildi |
-| Rapor taslağında S4 için "10 olay" yazdı | Ham veriden yeniden sayıldı: 9 | Düzeltildi |
-| Export'tan sonra UART görevini askıya aldı; lab'da PING yanıtı hiç gönderilmedi | Arayüzün uçtan uca testinde PING cevapsız kaldı | Görev export'tan sonra çalışmaya devam ediyor |
-| ADR-004'te "UART önceliği yükseltmek telemetriyi etkilemedi" yazdı | Meta verisiyle kontrol: iş süresi +36 µs, periyot sapması ±110 µs | Bedel ölçülen değerlerle yazıldı |
-| Lab `summary.csv` dosyasını, arayüzün CSV'leri taradığı klasöre koydu | Rapor sayıları doğrulanırken arayüzün yükleme kodu çöktü | Yükleyici yalnızca kayıt başlıklı CSV'leri alıyor |
-| Rapor §8'de iki sayıyı yanlış yazdı (eğim +3,7; pay %99) | Veriden yeniden hesaplandı: +3,4 ve %96 | Düzeltildi |
-| İlk S5 testinde bir düşüşü açıklayamadı (88 → 56 ms) | Resmi S5 ölçümünde son olayda aynı düşüş görüldü | Mekanizma bulundu: telemetri durunca kuyruk 5,56 ms/mesaj hızla eriyor |
-
-## Kendi cümlelerimle
-
-> _Bu bölüm bilerek boş bırakıldı. Ödev, kişinin öğrendiğini ve doğruladığını **kendi cümleleriyle** anlatmasını istiyor._
-
-- **Bu kod neden böyle çalışıyor?** _(Örn. neden UART'ın tek sahibi var, neden t₀ ISR'ın ilk satırında alınıyor.)_
-- **Hangi önerileri değiştirdim ya da reddettim, neden?** _(Örn. dil kuralları, S5 çözümlerini standart dışı ek deneye bırakma kararı.)_
-- **Kendim neyi kontrol ettim?**
-- **Nerede zorlandım?**
+Tasarım kararları da öneriler arasından seçildi ya da değiştirildi:
+- Zorunlu S0–S5 ölçümleri standart ayarlarla alındı. Çözüm denemeleri ayrı bir derlemeye (`APP_LAB_MODE`) ayrıldı.
+- Yedi çözüm varyantından tekrar edenler çıkarıldı, dört tanesi tutuldu.
+- Arayüz birkaç kez yeniden düzenlendi: önce referanstan farklı bir düzen, sonra Türkçe metinler ve koyu tema, en son tek işli sekmeler.

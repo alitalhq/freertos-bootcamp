@@ -7,6 +7,7 @@ Butona basıldığında "butona basıldı" yanıtının UART'tan ne kadar süred
 | [docs/spec.md](docs/spec.md) | Ödev metninden çıkarılan numaralı gereksinimler (R-xx), fazlar, kararlar |
 | [docs/adr/](docs/adr/) | Mimari kararlar: UART IT (001), TIM2 zaman tabanı (002), deney akışı (003), lab modu ve S5 çözümleri (004) |
 | [analysis/report.md](analysis/report.md) | **Analiz raporu**: sonuçlar, aşama analizi, hipotezler, ölçüm sınırları |
+| [observations.md](observations.md) | Gözlemler: ne yaptım ve nasıl çalıştırılır, ne bekledim ve ne gözlemledim, çözüm olarak ne yaptım |
 | [docs/code-notes.md](docs/code-notes.md) | ISR, görevler, UART TC ve zaman hesapları, kod bloklarıyla |
 | [docs/setup.md](docs/setup.md) | CubeMX ayarları adım adım, karşılaşılan tuzaklar |
 | [docs/ai-usage.md](docs/ai-usage.md) | Yapay zekâ kullanımı ve doğrulama |
@@ -49,6 +50,7 @@ Bu sonuçlar lab derlemesiyle (`APP_LAB_MODE 1`) alındı. Zorunlu S0–S5 ölç
 
 ```
 hafta-01/
+├── README.md, observations.md
 ├── firmware/odev01/        STM32CubeIDE projesi
 │   ├── odev01.ioc          CubeMX yapılandırması
 │   ├── Core/, Drivers/, Middlewares/   CubeMX üretir (FreeRTOSConfig.h: Core/Inc)
