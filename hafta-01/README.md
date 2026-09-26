@@ -16,6 +16,8 @@ Butona basıldığında "butona basıldı" yanıtının UART'tan ne kadar süred
 
 Her senaryoda 35 basış yapıldı. R değerleri ms cinsinden, yalnızca yanıtı gelen olaylar için. Tam tablo: [measurements/summary.csv](measurements/summary.csv).
 
+Resmi ölçümler `2dd9b59` commit'indeki firmware ile alındı. Güncel resmi derleme (`APP_LAB_MODE 0`) aynı davranışı veriyor: 26.09.2026'daki regresyon testinde S5 telemetri periyodu, CPU işi ve buton yanıtlarındaki birikim deseni µs düzeyinde aynı çıktı.
+
 | Senaryo | Telemetri | Ek CPU işi | Yanıt | R ort | R max | > 20 ms | Değişen aşama |
 |---|---|---|---|---|---|---|---|
 | S0 | kapalı | – | 35/35 | 5,67 | 5,67 | 0 | (referans: %98'i hat süresi) |
