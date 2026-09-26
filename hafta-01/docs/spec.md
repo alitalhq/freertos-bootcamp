@@ -347,7 +347,7 @@ firmware/odev01/            CubeMX (STM32CubeIDE toolchain) ile üretilen proje
 
 Sıralama bağımlılığı: F0 → F1 → F2 → F3 → F4 → F5 → F6 → F7 (F3'ten sonra paralel başlayabilir) → F8 → F9 → F10.
 
-**Durum (25.09.2026):** F0–F9 tamamlandı ve kartta doğrulandı. F10: dokümanlar hazır. Kalanlar: kök README'deki hazırlık bilgileri ve video.
+**Durum (25.09.2026):** F0–F9 tamamlandı ve kartta doğrulandı. F10: dokümanlar hazır. Kalan: video.
 
 ---
 
