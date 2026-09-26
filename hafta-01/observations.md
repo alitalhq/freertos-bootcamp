@@ -26,6 +26,7 @@ S0–S4'te beklentilerim tuttu. S5 beni şaşırttı: gecikme her basışta ~10 
 
 ## Çözüm olarak ne yaptım?
 
-Ayrı bir lab derlemesinde UartTxTask'ın önceliğini 1'den 4'e çıkardım. UART artık hesaplamayı kısa süre kesip sıradaki mesajı hemen başlatabiliyor; birikim kayboldu ve 35 yanıtın hiçbiri 20 ms'yi aşmadı. ButtonTask'ı da yükseltince en büyük R 10,3 ms'ye indi. Yalnızca ButtonTask'ı yükseltmek ise işe yaramadı, çünkü sorun UART'taydı.
+Ayrı bir lab derlemesinde iki çözüm denedim:
 
-Öncelikleri hiç değiştirmeden de çözülebiliyor: sıradaki mesajı görev yerine UART'ın TC kesmesi başlatınca hat boşta beklemiyor. Öncelikler 3 > 2 > 1 kalırken de hiçbir yanıt 20 ms'yi aşmadı (en büyük R 16,4 ms).
+- **TC zinciri:** Sıradaki mesajı görev yerine UART'ın TC kesmesi başlatıyor, böylece hat boşta beklemiyor. Görev öncelikleri 3 > 2 > 1 kalırken de 35 yanıtın hiçbiri 20 ms'yi aşmadı (en büyük R 16,4 ms).
+- **UART ve ButtonTask önceliğini CPU işinin üstüne almak:** UART sıradaki mesajı hesaplamayı kısa süre keserek başlatıyor, ButtonTask da artık hesaplamayı beklemiyor. En büyük R 10,3 ms'ye indi.

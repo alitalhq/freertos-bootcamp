@@ -154,33 +154,27 @@ Tahmin etmediğimiz iki şey vardı. Birincisi, gecikmenin **her basışla birik
 
 ## 8. Standart dışı ek deney: S5'i çözmek
 
-> **Ödev standardının dışında.** Lab derlemesiyle (`APP_LAB_MODE 1`) alındı. Görev öncelikleri ve kuyruk düzeni bilerek değiştirildi.
+> **Ödev standardının dışında.** Lab derlemesiyle (`APP_LAB_MODE 1`) alındı. Optimal çözümde görev öncelikleri bilerek değiştirildi; TC zincirinde öncelikler aynı.
 > Karar kaydı: [ADR-004](../docs/adr/ADR-004-lab-modu-ve-cozumler.md). Ham veri: [`measurements/lab/`](../measurements/lab/).
 > Her varyant S5 yükünde, 35 **otomatik** basışla ve **aynı basış dizisiyle** (`seed=7`) koşuldu.
 
 ![S5 çözümleri](plots/lab_fixes.png)
 
-| Varyant | Yanıt | Ort. R | Max R | > 20 ms | Kayıp TEL | txQ max |
-|---|---|---|---|---|---|---|
-| Standart (ödev), otomatik basış | 24/35 | 117,2 | 164,7 | 24 | 9 | 16 |
-| F4: ButtonTask önceliği 4 (naif) | 35/35 | 128,8 | 164,7 | **34** | 20 | 16 |
-| **F1: UartTxTask önceliği 4 (kök neden)** | **35/35** | **11,0** | **16,3** | **0** | 0 | 1 |
-| **F8: TC zinciri (öncelikler değişmez)** | **35/35** | **11,0** | **16,4** | **0** | 0 | 2 |
-| **F1 + F4: yanıt yolu CPU işinin üstünde** | **35/35** | **7,2** | **10,3** | **0** | 0 | 1 |
+| Varyant | Öncelikler | Yanıt | Ort. R | Max R | > 20 ms | Kayıp TEL | txQ max |
+|---|---|---|---|---|---|---|---|
+| Standart (ödev), otomatik basış | 3 > 2 > 1 | 24/35 | 117,2 | 164,7 | 24 | 9 | 16 |
+| **TC zinciri (F8)** | **3 > 2 > 1** | **35/35** | **11,0** | **16,4** | **0** | 0 | 2 |
+| **Optimal: UART + Button önceliği (F1 + F4)** | UART 4, Button 4 | **35/35** | **7,2** | **10,3** | **0** | 0 | 1 |
 
 R değerleri ms cinsinden. Tam tablo: [`measurements/lab/summary.csv`](../measurements/lab/summary.csv).
 
-**Hipotez testi.** §4.4'teki açıklama "gecikmenin nedeni UART görevinin CPU alamaması" diyordu. Bunu doğrulamak için **yalnızca** UART görevinin önceliğini değiştirdik (F1). Birikim tamamen kayboldu: txQ max 16'dan 1'e indi, TX öncesi beklemenin eğimi olay başına +3,4 ms'den (standart, otomatik basış) +0,03 ms'ye düştü, kayıp sıfırlandı.
+**TC zinciri: öncelik değiştirmeden çözüm.** §4.4'teki açıklama "gecikmenin nedeni UART görevinin CPU alamaması" diyordu. TC zincirinde sıradaki mesajı UartTxTask yerine TC kesmesinin kendisi kuyruktan alıp başlatıyor. Kesme, görev önceliklerinden bağımsız olarak hemen çalıştığı için hat boşta beklemiyor. Görev öncelikleri 3 > 2 > 1 kalırken birikim tamamen kayboldu: txQ max 16'dan 2'ye indi, TX öncesi beklemenin eğimi olay başına +3,4 ms'den ~0'a düştü, kayıp sıfırlandı. Bu, açıklamamızı doğruluyor. Telemetriye etkisi çok küçük: ortalama iş 5 054 µs. Görev beklemesi (≤ 5 ms) ise kalıyor, çünkü ButtonTask hâlâ CPU işinin altında; en büyük R bu yüzden 16,4 ms.
 
-**Öncelik değiştirmeden çözüm (F8).** Görev öncelikleri 3 > 2 > 1 kalırken de aynı sonuç alınabiliyor. Sıradaki mesajı UartTxTask yerine TC kesmesinin kendisi kuyruktan alıp başlatıyor. Kesme, görev önceliklerinden bağımsız olarak hemen çalıştığı için hat boşta beklemiyor. 35 yanıtın hepsi geldi, en büyük R 16,4 ms. Kök neden böylece ikinci, bağımsız bir yoldan da doğrulandı. Telemetriye etkisi F1'den küçük: ortalama iş 5 054 µs, F1'de 5 086 µs. Görev beklemesi (≤ 5 ms) ise kalıyor, çünkü ButtonTask hâlâ CPU işinin altında.
+**Optimal: UART ve Button görevleri CPU işinin üstünde.** UartTxTask önceliği 4 olunca sıradaki mesajı hesaplamayı birkaç µs keserek hemen başlatabiliyor. ButtonTask da 4 olunca görev beklemesi de kalkıyor (t₁−t₀ ort. 0,03 ms). En büyük R 10,3 ms'ye indi. Kalan süre fizik: hatta o an giden mesaj (≤ 5,56 ms) artı yanıtın kendi hat süresi (5,56 ms). Bedeli: ortalama iş süresi 5 050 → 5 086 µs uzadı, telemetri periyodunun sapması ±~110 µs'ye çıktı; CPU işi yine 10 ms'ye rahatça sığıyor. Öncelik "önem"e göre değil "aciliyet ve kısalığa" göre verildiği ve üste alınan görevlerin CPU kullanımı sınırlı olduğu için bu takas geçerli (ADR-004).
 
-**Naif çözüm neden işe yaramadı?** Teknik sunumdaki *"İlk değişikliğiniz ne olurdu? A: Görevin önceliğini yükseltirim"* sorusunun ölçülmüş cevabı bu. ButtonTask'ı yükseltmek görev beklemesini sıfırladı (t₁−t₀ ort. 0,03 ms), ama ortalama gecikmenin %96'sı TX öncesi beklemedeydi. 34/35 yanıt yine geç geldi. Yanıtlar kuyruğa artık TEL'den önce girdiği için BTN kaybı sıfırlandı, onun yerine 20 TEL kayboldu. Ölçmeden önce ilk yapılacak iş, gecikme bileşenlerini ayırmaktı (sunumdaki C seçeneği).
+**Denenip çıkarılanlar.** Yalnızca UART önceliği (F1) TC zinciriyle aynı sonucu verdi. Yalnızca ButtonTask önceliği (naif) işe yaramadı: 35 yanıttan 34'ü yine geç kaldı, çünkü birikim UART'taydı. Bunlar sadelik için arayüzden çıkarıldı (bkz. ADR-004).
 
-**Neden F1 + F4 en iyisi?** F1'den sonra kalan en büyük değişken, basışın 5 ms'lik hesaplama penceresine denk gelmesi. ButtonTask da işin üstüne alınınca max R 16,3'ten 10,3 ms'ye indi. Kalan süre fizik: hatta o an giden mesaj (≤ 5,56 ms) artı yanıtın kendi hat süresi (5,56 ms).
-
-**Bedeli ölçüldü.** UART görevi işi kestiği için ortalama iş süresi 5 050 → 5 086 µs uzadı, telemetri periyodunun sapması ±~30 µs'den ±~110 µs'ye çıktı. CPU işi yine 10 ms'ye rahatça sığıyor. Telemetri kaybı ise 9'dan 0'a indi. Öncelik "önem"e göre değil "aciliyet ve kısalığa" göre veriliyor; üste alınan görevlerin CPU kullanımı sınırlı olduğu için bu takas geçerli (ADR-004).
-
-**Seçilim yanlılığı.** Standart koşuda ortalama t₁−t₀ (0,47 ms), F1'dekinden (1,38 ms) düşük görünüyor. Bunun nedeni, hesaplama penceresine denk gelen basışların standart koşuda **kaybolan** basışlar olması. Ortalamalar yalnızca yanıtı gelen olaylardan hesaplandığı için bu basışlar hesaba girmiyor. Kayıplar raporlanmadan yapılan bir ortalama karşılaştırması yanıltıcı olurdu.
+**Seçilim yanlılığı.** Standart koşuda ortalama t₁−t₀ (0,47 ms), TC zincirindekinden (1,35 ms) düşük görünüyor. Bunun nedeni, hesaplama penceresine denk gelen basışların standart koşuda **kaybolan** basışlar olması. Ortalamalar yalnızca yanıtı gelen olaylardan hesaplandığı için bu basışlar hesaba girmiyor. Kayıplar raporlanmadan yapılan bir ortalama karşılaştırması yanıltıcı olurdu.
 
 **Sınırlar:**
 - Lab ölçümleri otomatik basışla alındı. Standart S5, otomatik basışla da elle ölçülenle aynı resmi verdi.

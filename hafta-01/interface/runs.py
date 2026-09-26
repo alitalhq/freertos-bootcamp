@@ -259,7 +259,7 @@ def default_runs() -> list[Run]:
             runs.append(load_csv(p, GROUP_OFFICIAL, f"{s} · resmi"))
     lab = meas / "lab"
     if lab.exists():
-        order = {0: 0, 4: 1, 1: 2, 8: 3, 5: 4}
+        order = {0: 0, 8: 1, 5: 2}
         labs = [load_csv(p, GROUP_LAB) for p in sorted(lab.glob("*.csv")) if is_record_csv(p)]
         labs.sort(key=lambda r: (r.period_ms, r.work_us, order.get(r.fix, 99)))
         for r in labs:

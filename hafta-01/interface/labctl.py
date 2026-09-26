@@ -31,8 +31,6 @@ FIX_BITS = {
 # Arayüzde gösterilen hazır çözüm seçenekleri: (anahtar, etiket, maske)
 FIX_PRESETS = [
     ("standard", "Standart (ödev tasarımı, yükte hatalı)", 0),
-    ("naive", "Naif: ButtonTask önceliğini artır", FIX_BTN_PRIO),
-    ("root", "Kök neden: UART görevinin önceliği", FIX_UART_PRIO),
     ("chain", "Öncelik değiştirmeden: TC zinciri", FIX_TC_CHAIN),
     ("optimal", "Optimal: UART ve Button görevleri CPU işinin üstünde", FIX_UART_PRIO | FIX_BTN_PRIO),
 ]
