@@ -388,7 +388,7 @@ Sıralama bağımlılığı: F0 → F1 → F2 → F3 → F4 → F5 → F6 → F7
 | 1 | Geliştirme ortamı: **STM32CubeIDE** (CubeMX, derleyici, ST-LINK ve debugger tek pakette) | ✅ 24.09.2026 |
 | 2 | GitHub deposu: `freertos-bootcamp`, **public** | ✅ 24.09.2026 |
 | 3 | PC'den UART RX ile senaryo seçme/başlatma (opsiyonel, ödev zorunlu tutmuyor) | ⏳ Zaman kalırsa yapılır |
-| 4 | S5'te gözlenen birikimli gecikme için çözüm denemeleri (öncelik, TC'den zincirleme gönderim, BTN önceliği vb.). Zorunlu S0–S5 standart ayarlarla bittikten **sonra** tartışılır, "standart dışı" etiketli ek deney olarak uygulanır ve README'de sapma gerekçesiyle açıklanır | ⏳ F9 sonrası |
+| 4 | S5'te gözlenen birikimli gecikme için çözüm denemeleri (öncelik, TC'den zincirleme gönderim, BTN önceliği vb.). Zorunlu S0–S5 standart ayarlarla bittikten **sonra** tartışılır, "standart dışı" etiketli ek deney olarak uygulanır ve README'de sapma gerekçesiyle açıklanır | ✅ 26.09.2026: ADR-004, rapor §8, lab arayüzü |
 
 ### Dil kuralları
 
@@ -406,3 +406,4 @@ Sıralama bağımlılığı: F0 → F1 → F2 → F3 → F4 → F5 → F6 → F7
 | [ADR-001](adr/ADR-001-uart-gonderim-yontemi.md) | UART gönderimi interrupt (IT) ile, t₄ TC callback'inde | Kabul edildi |
 | [ADR-002](adr/ADR-002-mikrosaniye-zaman-kaynagi.md) | µs zaman kaynağı TIM2, 32-bit, 1 MHz | Kabul edildi |
 | [ADR-003](adr/ADR-003-deney-kontrolu-ve-export.md) | Senaryo derleme zamanında seçiliyor, deney otomatik bitiyor, export'u UartTxTask yapıyor | Kabul edildi |
+| [ADR-004](adr/ADR-004-lab-modu-ve-cozumler.md) | Standart dışı lab modu (UART komutu, otomatik basış) ve S5 çözümleri `#ifdef` ile. Optimal: UART + Button görevleri CPU işinin üstünde | Kabul edildi |

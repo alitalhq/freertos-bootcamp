@@ -15,6 +15,7 @@
 | Ölçüm | Her senaryoyu derleyip yükledi, UART'ı dinleyip CSV'ye kaydetti | 6 × 35 basışı yaptım |
 | Analiz | `analyze.py`, grafikler ve rapor taslağı | _(doldurulacak)_ |
 | Dokümantasyon | README, setup, code-notes taslakları | _(doldurulacak)_ |
+| Lab modu ve çözümler (standart dışı) | Kök neden analizi, çözüm varyantları (`#ifdef`), UART komut kanalı, otomatik basış, `lab_app.py` arayüzü; varyantları kartta ölçtü | İsterleri belirledim: kendi deney ayarları, elle/otomatik seçimi, çözümlerin `#ifdef` ile ayrılması |
 
 ## Üretilen içerik nasıl doğrulandı?
 
@@ -40,6 +41,10 @@ Süreçte yapay zekânın önerileri ya da iddiaları birkaç kez yanlış çık
 | Bir testin beklentisini yanlış yazdı (fixture'da 1 BTN var dedi, 2 vardı) | Test başarısız oldu, veriye bakıldı | Test düzeltildi (kod doğruydu) |
 | S5 için "7 başarılı BTN = 7 kayıp TEL" dedi | Veriyle kontrol: olay 34 telemetri durduktan sonra geldi | Raporda "7'nin 6'sı açıklanıyor, 1'i bilinmiyor" olarak düzeltildi |
 | Rapor taslağında S4 için "10 olay" yazdı | Ham veriden yeniden sayıldı: 9 | Düzeltildi |
+| Export'tan sonra UART görevini askıya aldı; lab'da PING yanıtı hiç gönderilmedi | Arayüzün uçtan uca testinde PING cevapsız kaldı | Görev export'tan sonra çalışmaya devam ediyor |
+| ADR-004'te "UART önceliği yükseltmek telemetriyi etkilemedi" yazdı | Meta verisiyle kontrol: iş süresi +36 µs, periyot sapması ±110 µs | Bedel ölçülen değerlerle yazıldı |
+| Lab `summary.csv` dosyasını, arayüzün CSV'leri taradığı klasöre koydu | Rapor sayıları doğrulanırken arayüzün yükleme kodu çöktü | Yükleyici yalnızca kayıt başlıklı CSV'leri alıyor |
+| Rapor §8'de iki sayıyı yanlış yazdı (eğim +3,7; pay %99) | Veriden yeniden hesaplandı: +3,4 ve %96 | Düzeltildi |
 | İlk S5 testinde bir düşüşü açıklayamadı (88 → 56 ms) | Resmi S5 ölçümünde son olayda aynı düşüş görüldü | Mekanizma bulundu: telemetri durunca kuyruk 5,56 ms/mesaj hızla eriyor |
 
 ## Kendi cümlelerimle

@@ -41,4 +41,29 @@
    Ölçüm derlemelerinde TANIMLI OLMAMALI. */
 /* #define TEST_AUTO_STOP_MS   10000U */
 
+/* ==== Lab modu (standart dışı, ADR-004) ==================================
+   0: Resmi ödev derlemesi. S0–S5 bu ayarla ölçüldü; aşağıdaki hiçbir çözüm
+      ve UART komut kanalı derlenmez.
+   1: Lab derlemesi. Kart bir kez yüklenir; PC arayüzü UART'tan RUN komutuyla
+      periyot, CPU işi, çözüm maskesi ve basış kaynağını (elle/otomatik) seçer. */
+#ifndef APP_LAB_MODE
+#define APP_LAB_MODE           0
+#endif
+
+#if APP_LAB_MODE
+/* S5'teki birikimli gecikmeye karşı çözüm denemeleri. Her biri kendi
+   #ifdef bloğunda; çalışma anında RunConfig.fix_mask ile seçilir. */
+#define ENABLE_FIX_UART_PRIO          /* F1: UartTxTask önceliği 4 (kök neden) */
+#define ENABLE_FIX_BTN_PRIO           /* F4: ButtonTask önceliği 4 (tek başına naif; F1 ile optimal) */
+#endif
+
+/* fix_mask bitleri. Arayüzdeki 4 seçenek: 0 standart, 4 naif, 1 kök neden,
+   5 optimal (1|4). 0x2 ve 0x8 önceki deneylerde kullanıldı, artık yok. */
+#define FIX_UART_PRIO          0x1U
+#define FIX_BTN_PRIO           0x4U
+
+#define PRIO_RAISED            4       /* çözümlerde kullanılan yükseltilmiş öncelik */
+#define PRIO_INJECT            5       /* otomatik basış üreteci (lab), her şeyin üstünde */
+#define STACK_INJECT           128
+
 #endif /* APP_CONFIG_H */

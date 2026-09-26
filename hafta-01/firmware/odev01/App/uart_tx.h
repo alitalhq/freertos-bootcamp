@@ -13,6 +13,9 @@ void uart_tx_create(void);
    kopyalar (R-Q-3). Kuyruk doluysa false döner; drop'u çağıran sayar. */
 bool uart_tx_post(const TxMsg *m);
 
+/* Lab: RX kesmesinden LAB yanıtı göndermek için. */
+void uart_tx_post_from_isr(const TxMsg *m);
+
 /* Deney sonu export işaretini göndermek için (bkz. button.c). */
 QueueHandle_t uart_tx_queue(void);
 

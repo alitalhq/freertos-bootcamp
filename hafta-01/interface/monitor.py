@@ -71,6 +71,7 @@ class Session:
         self.tel_times: deque[float] = deque()   # yalnızca gösterim: PC'de gözlenen hız
         self.new_btn: list[tuple[str, str]] = []
         self.new_export: Export | None = None
+        self.new_lab: list[str] = []             # lab modu: kartın LAB satırları
 
     def feed(self, data: bytes) -> None:
         for raw in self.framer.feed(data):
@@ -87,6 +88,8 @@ class Session:
                 else:
                     self.btn_count += 1
                     self.new_btn.append((line.fields[0], line.fields[1]))
+            elif line.kind == "LAB":
+                self.new_lab.append(raw.decode().rstrip())
             elif line.kind == "UNKNOWN":
                 self.unknown += 1
             else:

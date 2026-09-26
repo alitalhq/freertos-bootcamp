@@ -5,7 +5,7 @@ Butona basıldığında "butona basıldı" yanıtının UART'tan ne kadar süred
 | Belge | İçerik |
 |---|---|
 | [docs/spec.md](docs/spec.md) | Ödev metninden çıkarılan numaralı gereksinimler (R-xx), fazlar, kararlar |
-| [docs/adr/](docs/adr/) | Mimari kararlar: UART IT (001), TIM2 zaman tabanı (002), deney akışı (003) |
+| [docs/adr/](docs/adr/) | Mimari kararlar: UART IT (001), TIM2 zaman tabanı (002), deney akışı (003), lab modu ve S5 çözümleri (004) |
 | [analysis/report.md](analysis/report.md) | **Analiz raporu**: sonuçlar, aşama analizi, hipotezler, ölçüm sınırları |
 | [docs/code-notes.md](docs/code-notes.md) | ISR, görevler, UART TC ve zaman hesapları, kod bloklarıyla |
 | [docs/setup.md](docs/setup.md) | CubeMX ayarları adım adım, karşılaşılan tuzaklar |
@@ -29,6 +29,21 @@ Her senaryoda 35 basış yapıldı. R değerleri ms cinsinden, yalnızca yanıt�
 - **S5'te iki yük birleşiyor.** En düşük öncelikli UART görevi periyot başına yalnızca 1 mesaj başlatabiliyor, bu da telemetri üretimine tam eşit. Her BTN yanıtı kalıcı birikim yaratıyor. Kuyruk dolunca yanıtlar kayboluyor. Ayrıntı: [rapor §4.4](analysis/report.md#44-s5-iki-yük-birleşince-kapasite-sıfıra-iniyor).
 
 ![Olay başına yanıt süresi](analysis/plots/response_per_event.png)
+
+### Standart dışı ek deney: S5'i çözmek
+
+Kök neden ölçümle doğrulandı ve giderildi ([rapor §8](analysis/report.md#8-standart-dışı-ek-deney-s5i-çözmek), [ADR-004](docs/adr/ADR-004-lab-modu-ve-cozumler.md)). Aynı S5 yükünde, 35 otomatik basışla:
+
+| Varyant | Yanıt | Max R | > 20 ms |
+|---|---|---|---|
+| Standart (ödev) | 24/35 | 164,7 ms | 24 |
+| Naif: ButtonTask önceliği ↑ | 35/35 | 164,7 ms | **34** |
+| Kök neden: UartTxTask önceliği ↑ | 35/35 | 16,3 ms | 0 |
+| **Optimal: UartTxTask + ButtonTask, CPU işinin üstünde** | **35/35** | **10,3 ms** | **0** |
+
+Bu sonuçlar lab derlemesiyle (`APP_LAB_MODE 1`) alındı. Zorunlu S0–S5 ölçümleri standart derlemeyle alındı ve bu ek deneyden etkilenmiyor.
+
+![S5 çözümleri](analysis/plots/lab_fixes.png)
 
 ## Depo yapısı
 
@@ -90,6 +105,34 @@ Arayüz şunları yapıyor:
 
 R, yalnızca kartın t₀…t₄ damgalarından hesaplanıyor; PC saati kullanılmıyor.
 
+## RTOS Lab arayüzü (standart dışı)
+
+`interface/lab_app.py`: karta doğrudan bağlanan, deney koşturan ve sonuçları analiz eden masaüstü uygulaması (PySide6).
+
+```bash
+cd hafta-01/interface
+pip install -r requirements.txt
+python lab_app.py
+```
+
+- **Açılışta** resmi S0–S5 ölçümleri ve S5 çözüm denemeleri yüklü gelir. Kart bağlı olmasa da incelenebilir.
+- **Kendi deneyin:** Karta bir kez lab derlemesini yükle (`App/app_config.h` → `#define APP_LAB_MODE 1`, derle, yükle). Arayüzde bağlan, sonra seç:
+  - senaryo (S0–S5) ya da özel telemetri periyodu ve CPU işi,
+  - çözüm yolu: standart, naif, kök neden, optimal,
+  - basış kaynağı: **otomatik** (EXTI yazılım tetik) ya da **elle** (B1),
+  - olay sayısı.
+
+  **Start experiment** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir.
+- **Sekmeler:**
+  - *Charts:* olay başına R ve aşama ortalamaları.
+  - *Deadline analysis:* seçilen olayın aşamaları, deadline payı ve ölçümden çıkarılan neden.
+  - *Compare:* denemeleri yan yana karşılaştırma.
+  - *Event records:* olay bazında tablo.
+  - *Counters and guide:* sayaçlar ve kullanım rehberi.
+- Kayıt: **Save CSV** (ödev formatı + meta), **Save raw session** (ham UART baytları), **Open session file** (ikisini de açar).
+
+Komut satırından aynı deneyler: `python labctl.py run --preset S5 --fix optimal --inject auto`.
+
 ## Senaryo seçimi ve ölçüm adımları
 
 Her senaryo için:
@@ -123,4 +166,6 @@ Her kabul edilen olay şu durumlardan biriyle biter: `ok`, `btn_drop`, `tx_drop`
 | `defaultTask` kendini siliyor | CubeMX silmeye izin vermedi. Öncelik Low'a indirildi, görev ilk satırında `vTaskDelete(NULL)` çağırıyor |
 | Board BSP kapalı | CubeMX'in NUCLEO BSP'si EXTI önceliğini 15'e eziyor ve kendi callback'ini tanımlıyordu. Kapatıldı, PC13/PA5 normal GPIO olarak ayarlandı ([setup.md](docs/setup.md)) |
 
-Ödevin **standart ayarlarının** hiçbiri değiştirilmedi: 115200 8N1, 64 bayt, kuyruklar 8/16 FIFO, IT + TC'ye kadar blok, öncelikler 3 > 2 > 1, deadline 20 ms.
+| Lab derlemesi | `APP_LAB_MODE 1`: UART komut kanalı, otomatik basış ve çözüm varyantları (`#ifdef ENABLE_FIX_*`). Yalnızca rapor §8 ve lab arayüzü için. Varsayılan 0 |
+
+Zorunlu S0–S5 ölçümlerinde ödevin **standart ayarlarının** hiçbiri değiştirilmedi: 115200 8N1, 64 bayt, kuyruklar 8/16 FIFO, IT + TC'ye kadar blok, öncelikler 3 > 2 > 1, deadline 20 ms.

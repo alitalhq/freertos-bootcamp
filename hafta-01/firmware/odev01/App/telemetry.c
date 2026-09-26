@@ -14,7 +14,7 @@
 static void TelemetryTask(void *arg)
 {
     (void)arg;
-    const Scenario *sc = scenario_get();
+    const RunConfig *sc = run_config();
 
     if (sc->period_ms == 0U)
     {

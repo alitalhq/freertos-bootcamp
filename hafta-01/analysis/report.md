@@ -148,6 +148,40 @@ Tahmin etmediğimiz iki şey vardı. Birincisi, gecikmenin **her basışla birik
 - **7. TEL kaybının zamanı bilinmiyor (S5).** Firmware yalnızca TEL kayıp sayacını tutuyor, hangi sıra numarasının düştüğünü kaydetmiyor. Doymanın başlangıcında olmuş olabilir. Bu bir hipotez, doğrulanmadı.
 - **Basış zamanlaması elle.** Aralıklar düzensiz tutuldu (0,54–2,18 s). Yine de telemetri fazına göre düzgün dağıldığı garanti değil.
 
-## 7. Sonraki adım
+## 7. Zorunlu kısmın sonucu
 
-Zorunlu senaryolar standart ayarlarla tamamlandı. S5'teki birikimi gidermek için tasarım değişiklikleri (UartTxTask önceliği, TC'den zincirleme gönderim, BTN yanıtlarına öncelik) **ödev standardının dışında** kalıyor. Bunlar ayrı, "standart dışı" etiketli ek deneyler olarak ele alınacak (spec §15 madde 4). Buradaki S0–S5 sonuçları bu deneylerden etkilenmeyecek.
+Ödevin altı senaryosu standart ayarlarla ölçüldü ve açıklandı. Frekans TX öncesi beklemeyi, CPU yükü görev beklemesini büyütüyor. İkisi S5'te birleşince UART görevi aç kalıyor ve gecikme sınırsız büyüyor. Aşağıdaki bölüm bu sonuçları değiştirmiyor, üzerine ekleniyor.
+
+## 8. Standart dışı ek deney: S5'i çözmek
+
+> **Ödev standardının dışında.** Lab derlemesiyle (`APP_LAB_MODE 1`) alındı. Görev öncelikleri ve kuyruk düzeni bilerek değiştirildi.
+> Karar kaydı: [ADR-004](../docs/adr/ADR-004-lab-modu-ve-cozumler.md). Ham veri: [`measurements/lab/`](../measurements/lab/).
+> Her varyant S5 yükünde, 35 **otomatik** basışla ve **aynı basış dizisiyle** (`seed=7`) koşuldu.
+
+![S5 çözümleri](plots/lab_fixes.png)
+
+| Varyant | Yanıt | Ort. R | Max R | > 20 ms | Kayıp TEL | txQ max |
+|---|---|---|---|---|---|---|
+| Standart (ödev), otomatik basış | 24/35 | 117,2 | 164,7 | 24 | 9 | 16 |
+| F4: ButtonTask önceliği 4 (naif) | 35/35 | 128,8 | 164,7 | **34** | 20 | 16 |
+| **F1: UartTxTask önceliği 4 (kök neden)** | **35/35** | **11,0** | **16,3** | **0** | 0 | 1 |
+| **F1 + F4: yanıt yolu CPU işinin üstünde** | **35/35** | **7,2** | **10,3** | **0** | 0 | 1 |
+
+R değerleri ms cinsinden. Tam tablo: [`measurements/lab/summary.csv`](../measurements/lab/summary.csv).
+
+**Hipotez testi.** §4.4'teki açıklama "gecikmenin nedeni UART görevinin CPU alamaması" diyordu. Bunu doğrulamak için **yalnızca** UART görevinin önceliğini değiştirdik (F1). Birikim tamamen kayboldu: txQ max 16'dan 1'e indi, TX öncesi beklemenin eğimi olay başına +3,4 ms'den (standart, otomatik basış) +0,03 ms'ye düştü, kayıp sıfırlandı. (Öncelik değiştirmeden, sıradaki gönderimi TC kesmesinden başlatan bir varyant da aynı sonucu verdi. Tekrar ettiği için kaldırıldı; bkz. ADR-004.)
+
+**Naif çözüm neden işe yaramadı?** Teknik sunumdaki *"İlk değişikliğiniz ne olurdu? A: Görevin önceliğini yükseltirim"* sorusunun ölçülmüş cevabı bu. ButtonTask'ı yükseltmek görev beklemesini sıfırladı (t₁−t₀ ort. 0,03 ms), ama ortalama gecikmenin %96'sı TX öncesi beklemedeydi. 34/35 yanıt yine geç geldi. Yanıtlar kuyruğa artık TEL'den önce girdiği için BTN kaybı sıfırlandı, onun yerine 20 TEL kayboldu. Ölçmeden önce ilk yapılacak iş, gecikme bileşenlerini ayırmaktı (sunumdaki C seçeneği).
+
+**Neden F1 + F4 en iyisi?** F1'den sonra kalan en büyük değişken, basışın 5 ms'lik hesaplama penceresine denk gelmesi. ButtonTask da işin üstüne alınınca max R 16,3'ten 10,3 ms'ye indi. Kalan süre fizik: hatta o an giden mesaj (≤ 5,56 ms) artı yanıtın kendi hat süresi (5,56 ms).
+
+**Bedeli ölçüldü.** UART görevi işi kestiği için ortalama iş süresi 5 050 → 5 086 µs uzadı, telemetri periyodunun sapması ±~30 µs'den ±~110 µs'ye çıktı. CPU işi yine 10 ms'ye rahatça sığıyor. Telemetri kaybı ise 9'dan 0'a indi. Öncelik "önem"e göre değil "aciliyet ve kısalığa" göre veriliyor; üste alınan görevlerin CPU kullanımı sınırlı olduğu için bu takas geçerli (ADR-004).
+
+**Seçilim yanlılığı.** Standart koşuda ortalama t₁−t₀ (0,47 ms), F1'dekinden (1,38 ms) düşük görünüyor. Bunun nedeni, hesaplama penceresine denk gelen basışların standart koşuda **kaybolan** basışlar olması. Ortalamalar yalnızca yanıtı gelen olaylardan hesaplandığı için bu basışlar hesaba girmiyor. Kayıplar raporlanmadan yapılan bir ortalama karşılaştırması yanıltıcı olurdu.
+
+**Sınırlar:**
+- Lab ölçümleri otomatik basışla alındı. Standart S5, otomatik basışla da elle ölçülenle aynı resmi verdi.
+- Her varyant tek bir koşu ve aynı basış dizisiyle ölçüldü. Farklı `seed`'lerle tekrar, sonuçların sağlamlığını gösterir; bu yapılmadı.
+- Gözlenen maksimum worst-case değil.
+
+Deneyleri tekrar etmek ya da kendi ayarlarınla denemek için: `interface/lab_app.py` (README → "RTOS Lab arayüzü").

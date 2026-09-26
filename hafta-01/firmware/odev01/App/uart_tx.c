@@ -7,6 +7,8 @@
 #include "records.h"
 #include "timebase.h"
 #include "stats.h"
+#include "scenario.h"
+#include "lab.h"
 
 #include "main.h"
 #include "usart.h"
@@ -35,6 +37,15 @@ bool uart_tx_post(const TxMsg *m)
     stats_update_max(&g_stats.txq_hwm, (uint32_t)uxQueueMessagesWaiting(s_txq));
     return true;
 }
+
+#if APP_LAB_MODE
+void uart_tx_post_from_isr(const TxMsg *m)
+{
+    BaseType_t wake = pdFALSE;
+    (void)xQueueSendFromISR(s_txq, m, &wake);
+    portYIELD_FROM_ISR(wake);
+}
+#endif
 
 QueueHandle_t uart_tx_queue(void)
 {
@@ -89,6 +100,9 @@ static void UartTxTask(void *arg)
 {
     (void)arg;
     TxMsg m;
+#if APP_LAB_MODE
+    lab_start();                          /* RX'i kur, LAB satırını gönder */
+#endif
 
     for (;;)
     {
@@ -99,7 +113,9 @@ static void UartTxTask(void *arg)
             /* Kuyruk FIFO: bu işaretten önceki tüm mesajlar gönderildi. */
             export_all();
             g_exp_state = EXP_DONE;
-            vTaskSuspend(NULL);
+            /* Askıya alınmıyor: lab'da PING yanıtı gibi mesajlar hâlâ gönderilebilsin.
+               Resmi derlemede bu noktadan sonra kuyruğa mesaj gelmez. */
+            continue;
         }
 
         memcpy(s_tx_buf, m.data, MSG_LEN);
@@ -126,8 +142,17 @@ void uart_tx_create(void)
     s_txq = xQueueCreate(TX_QUEUE_LEN, sizeof(TxMsg));
     configASSERT(s_txq != NULL);
 
+    UBaseType_t prio = PRIO_UART_TX;
+#ifdef ENABLE_FIX_UART_PRIO
+    if (run_config()->fix_mask & FIX_UART_PRIO)
+    {
+        /* F1 (kök neden): UART görevi TelemetryTask'ın işini birkaç µs kesip
+           sonraki gönderimi hemen başlatabilir; hat boşta beklemez. */
+        prio = PRIO_RAISED;
+    }
+#endif
     BaseType_t ok = xTaskCreate(UartTxTask, "uart_tx", STACK_UART_TX, NULL,
-                                PRIO_UART_TX, &s_task);
+                                prio, &s_task);
     configASSERT(ok == pdPASS);
 }
 
@@ -159,6 +184,12 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
         return;
     }
     g_stats.uart_error++;
+#if APP_LAB_MODE
+    /* Lab'da RX de açık. ORE/FE/NE/PE alıcı tarafının hataları; HAL yalnızca
+       RX'i sonlandırır, süren gönderim etkilenmez. RX'i yeniden kur. */
+    lab_rx_rearm();
+    return;
+#endif
     s_tx_failed = true;
     s_cur_is_btn = false;
     BaseType_t wake = pdFALSE;

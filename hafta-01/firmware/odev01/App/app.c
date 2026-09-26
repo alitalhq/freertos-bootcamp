@@ -5,13 +5,15 @@
 #include "telemetry.h"
 #include "scenario.h"
 #include "workload.h"
+#include "lab.h"
 
 void app_init(void)
 {
     /* Scheduler öncesi: yalnızca donanım hazırlığı. UART'a buradan
        yazılmaz; UART'ın tek sahibi UartTxTask (R-TSK-2). */
     timebase_init();
-    workload_calibrate(scenario_get()->work_us);   /* R-WRK-3 */
+    run_config_init();
+    workload_calibrate(run_config()->work_us);   /* R-WRK-3 */
 }
 
 void app_create_tasks(void)
@@ -20,4 +22,7 @@ void app_create_tasks(void)
     uart_tx_create();
     button_create();
     telemetry_create();
+#if APP_LAB_MODE
+    lab_create_tasks();                   /* otomatik basış (inject=1 ise) */
+#endif
 }

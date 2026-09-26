@@ -5,6 +5,7 @@
 #include "stats.h"
 #include "msg.h"
 #include "workload.h"
+#include "lab.h"
 
 #include "main.h"
 #include "FreeRTOS.h"
@@ -35,7 +36,7 @@ static void send(TextBuilder *b)
 
 static void export_cfg(void)
 {
-    const Scenario *sc = scenario_get();
+    const RunConfig *sc = run_config();
     TextBuilder b;
 
     begin(&b, "CFG,scenario=");
@@ -55,7 +56,7 @@ static void export_cfg(void)
     begin(&b, "CFG");
     kv(&b, "period_ms", sc->period_ms);
     kv(&b, "work_us", sc->work_us);
-    kv(&b, "target_events", TARGET_EVENTS);
+    kv(&b, "target_events", sc->target);
     kv(&b, "warmup_ms", WARMUP_MS);
     kv(&b, "debounce_us", DEBOUNCE_US);
     kv(&b, "deadline_us", DEADLINE_US);
@@ -73,12 +74,26 @@ static void export_cfg(void)
     kv(&b, "calib_us", wc->calib_us);
     kv(&b, "work_iters", wc->work_iters);
     send(&b);
+
+    /* Standart dışı ayarlar: resmi derlemede lab=0, fix=0, inject=0. */
+    begin(&b, "CFG");
+    kv(&b, "lab", APP_LAB_MODE);
+    kv(&b, "fix", sc->fix_mask);
+    kv(&b, "inject", sc->inject);
+#if APP_LAB_MODE
+    kv(&b, "gap_min_ms", sc->gap_min_ms);
+    kv(&b, "gap_max_ms", sc->gap_max_ms);
+    kv(&b, "seed", sc->seed);
+    kv(&b, "run", sc->run_id);
+    kv(&b, "injected", lab_injected_count());
+#endif
+    send(&b);
 }
 
 /* REC,<Sx>,<id>,<t0>,<t1>,<t2>,<t3>,<t4>,<status> — eksik alan boş (R-REC-4) */
 static void export_records(void)
 {
-    const char *name = scenario_get()->name;
+    const char *name = run_config()->name;
     uint32_t n = g_stats.accepted;
     if (n > REC_POOL_SIZE)
     {

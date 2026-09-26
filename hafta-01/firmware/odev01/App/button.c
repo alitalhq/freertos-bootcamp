@@ -58,7 +58,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t pin)
     const uint32_t id = s_next_id++;
     g_stats.accepted++;
     records_open(id, now);
-    if (s_next_id >= TARGET_EVENTS)
+    if (s_next_id >= run_config()->target)
     {
         g_exp_state = EXP_STOPPING;
     }
@@ -82,6 +82,20 @@ void HAL_GPIO_EXTI_Callback(uint16_t pin)
     portYIELD_FROM_ISR(wake);
 }
 
+void button_request_stop_from_isr(void)
+{
+    if (g_exp_state >= EXP_STOPPING)
+    {
+        return;
+    }
+    g_exp_state = EXP_STOPPING;
+    /* ButtonTask olay beklerken bloklu olabilir: kontrol olayıyla uyandır. */
+    ButtonEvent e = { BUTTON_CTRL_STOP_ID, 0 };
+    BaseType_t wake = pdFALSE;
+    (void)xQueueSendFromISR(s_button_q, &e, &wake);
+    portYIELD_FROM_ISR(wake);
+}
+
 static void post_export_marker(void)
 {
     TxMsg m = { .type = MSG_CTRL_EXPORT };
@@ -90,16 +104,51 @@ static void post_export_marker(void)
     xQueueSend(uart_tx_queue(), &m, portMAX_DELAY);
 }
 
+/* t1, yanıt mesajı, t2 ve txQ'ya gönderim. */
+static void reply_to_event(const ButtonEvent *e, const RunConfig *sc)
+{
+    records_stamp(e->id, T1, timer_us());
+
+    TxMsg m;
+    TextBuilder b;
+    msg_begin(&b, &m, MSG_BTN, e->id);
+    tb_put_str(&b, "BTN,");
+    tb_put_u32(&b, e->id);
+    tb_put_str(&b, ",");
+    tb_put_str(&b, sc->name);
+    tb_put_str(&b, ",PRESSED");
+    if (!msg_finish(&b))
+    {
+        g_stats.msg_overflow++;
+        configASSERT(0);
+    }
+
+    records_stamp(e->id, T2, timer_us());   /* gönderimden hemen önce */
+    if (!uart_tx_post(&m))
+    {
+        g_stats.btn_tx_drop++;
+        records_set_status(e->id, ST_TX_DROP);
+    }
+}
+
 static void ButtonTask(void *arg)
 {
     (void)arg;
-    const Scenario *sc = scenario_get();
+    const RunConfig *sc = run_config();
     ButtonEvent e;
 
     /* Isınma: telemetri çalışıyor, basışlar yok sayılıyor, LD2 sönük. */
     vTaskDelay(pdMS_TO_TICKS(WARMUP_MS));
-    g_exp_state = EXP_RUNNING;
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    taskENTER_CRITICAL();
+    if (g_exp_state == EXP_WARMUP)
+    {
+        g_exp_state = EXP_RUNNING;
+    }
+    taskEXIT_CRITICAL();
+    if (g_exp_state == EXP_RUNNING)
+    {
+        HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+    }
 
 #ifdef TEST_AUTO_STOP_MS
     vTaskDelay(pdMS_TO_TICKS(TEST_AUTO_STOP_MS));
@@ -111,31 +160,13 @@ static void ButtonTask(void *arg)
     for (;;)
     {
         xQueueReceive(s_button_q, &e, portMAX_DELAY);
-        records_stamp(e.id, T1, timer_us());
-
-        TxMsg m;
-        TextBuilder b;
-        msg_begin(&b, &m, MSG_BTN, e.id);
-        tb_put_str(&b, "BTN,");
-        tb_put_u32(&b, e.id);
-        tb_put_str(&b, ",");
-        tb_put_str(&b, sc->name);
-        tb_put_str(&b, ",PRESSED");
-        if (!msg_finish(&b))
+        if (e.id != BUTTON_CTRL_STOP_ID)      /* lab STOP kontrolü olay değildir */
         {
-            g_stats.msg_overflow++;
-            configASSERT(0);
-        }
-
-        records_stamp(e.id, T2, timer_us());   /* gönderimden hemen önce */
-        if (!uart_tx_post(&m))
-        {
-            g_stats.btn_tx_drop++;
-            records_set_status(e.id, ST_TX_DROP);
+            reply_to_event(&e, sc);
         }
 
         /* Son olay işlendi ve kuyrukta bekleyen yoksa export'u başlat.
-           Öncelik 2 > 1: buttonQ boşken UartTxTask henüz çalışmamış olur. */
+           İşaret txQ'nun sonuna girer; FIFO sayesinde son yanıttan sonra işlenir. */
         if (g_exp_state == EXP_STOPPING && uxQueueMessagesWaiting(s_button_q) == 0U)
         {
             post_export_marker();
@@ -149,7 +180,15 @@ void button_create(void)
     s_button_q = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(ButtonEvent));
     configASSERT(s_button_q != NULL);
 
+    UBaseType_t prio = PRIO_BUTTON;
+#ifdef ENABLE_FIX_BTN_PRIO
+    if (run_config()->fix_mask & FIX_BTN_PRIO)
+    {
+        /* F4: tek başına naif (t1-t0'ı giderir, birikimi değil); F1 ile optimal. */
+        prio = PRIO_RAISED;
+    }
+#endif
     BaseType_t ok = xTaskCreate(ButtonTask, "button", STACK_BUTTON, NULL,
-                                PRIO_BUTTON, NULL);
+                                prio, NULL);
     configASSERT(ok == pdPASS);
 }

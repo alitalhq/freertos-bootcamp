@@ -5,6 +5,8 @@ Tüm çıktılar yalnızca ham CSV + meta dosyalarından üretilir (elle düzelt
   analysis/plots/response_per_event.png   olay no -> R, 20 ms deadline
   analysis/plots/stage_breakdown.png      senaryo -> aşama ortalamaları (yığılmış)
   analysis/plots/stage_distribution.png   senaryo -> t1-t0 ve t3-t2 dağılımı
+  measurements/lab/summary.csv, analysis/plots/lab_fixes.png
+                                          standart dışı ek deney: S5 çözümleri
 
 Kullanım: python analysis/analyze.py
 """
@@ -237,6 +239,76 @@ def plot_stage_distribution(data: dict) -> Path:
     return out
 
 
+# ---------------------------------------------------- standart dışı ek deney --
+
+LAB_ORDER = [("S5a", "standard"), ("S5-F4a", "naive:\nButtonTask prio"),
+             ("S5-F1a", "root cause:\nUART prio"), ("S5-F5a", "optimal:\nUART + Button prio")]
+
+
+def load_lab() -> list[tuple[str, str, list[dict], dict]]:
+    out = []
+    for name, label in LAB_ORDER:
+        p = MEAS / "lab" / f"{name}.csv"
+        if p.exists():
+            rows = []
+            with p.open() as f:
+                for r in csv.DictReader(f):
+                    r["event_id"] = int(r["event_id"])
+                    for k in ("t0_us", "t1_us", "t2_us", "t3_us", "t4_us"):
+                        r[k] = int(r[k]) if r[k] else None
+                    rows.append(r)
+            meta = {}
+            for line in (MEAS / "lab" / f"{name}_meta.txt").read_text().splitlines():
+                for kv in line.split(",")[1:]:
+                    if "=" in kv:
+                        k, v = kv.split("=", 1)
+                        meta[k] = v
+            out.append((name, label, rows, meta))
+    return out
+
+
+def plot_lab_fixes(lab) -> Path:
+    """S5 yükü altında çözüm denemeleri: aşama ortalamaları (yığılmış) + max R.
+    Eşiği çok aşanlar kırpılır, değeri üstte yazılır (log ölçek yığını çarpıtır)."""
+    fig, ax = new_fig(12, 5)
+    style(ax, "mean duration per stage (ms)")
+    cap = 32
+    x = np.arange(len(lab))
+    bottom = np.zeros(len(lab))
+    for i, (a, b, name) in enumerate(STAGES):
+        vals = np.array([statistics.mean(diff(r[a], r[b]) for r in rows if r["status"] == "ok") / 1000
+                         for _, _, rows, _ in lab])
+        ax.bar(x, vals, bottom=bottom, width=0.62, color=SERIES[i], edgecolor=SURFACE, linewidth=1.5, label=name)
+        bottom += vals
+    maxes = [max(r_us(r) for r in rows if r["status"] == "ok") / 1000 for _, _, rows, _ in lab]
+    ax.scatter(x, [min(m, cap * 0.985) for m in maxes], marker="_", s=320, color=INK, linewidth=2, zorder=4,
+               label="max R")
+    ax.axhline(DEADLINE_US / 1000, color=CRITICAL, linestyle="--", linewidth=1)
+    ax.text(len(lab) - 0.45, DEADLINE_US / 1000, "deadline 20 ms", ha="right", va="bottom", fontsize=8, color=INK2)
+    for xi, tot, mx, (_, _, rows, meta) in zip(x, bottom, maxes, lab):
+        ok = [r for r in rows if r["status"] == "ok"]
+        late = sum(r_us(r) > DEADLINE_US for r in ok)
+        lost = len(rows) - len(ok)
+        info = f"{late} late · {lost} lost\ntxQ max {meta.get('txq_hwm')}"
+        if tot > cap:
+            ax.text(xi, cap * 0.93, f"▲ mean {tot:.0f} ms\n" + info, ha="center", va="top", fontsize=8,
+                    color=CRITICAL, bbox=dict(fc=SURFACE, ec="none", pad=1))
+        else:
+            ax.text(xi, max(tot, mx) + 0.6, f"max {mx:.1f} ms\n" + info, ha="center", va="bottom", fontsize=8,
+                    color=CRITICAL if late or lost else INK2)
+    ax.set_ylim(0, cap)
+    ax.set_xticks(x, [lbl for _, lbl, _, _ in lab], fontsize=9)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.16), ncols=5, fontsize=8, frameon=False,
+              labelcolor=INK2)
+    fig.suptitle("S5 load (100 Hz + 5 ms CPU work), 35 auto presses each, same press sequence (seed 7) — "
+                 "NON-STANDARD lab experiment", x=0.01, ha="left", fontsize=11, color=INK)
+    fig.tight_layout(rect=(0, 0, 1, 0.95))
+    out = PLOTS / "lab_fixes.png"
+    fig.savefig(out, dpi=150, facecolor=SURFACE)
+    plt.close(fig)
+    return out
+
+
 def main() -> None:
     PLOTS.mkdir(parents=True, exist_ok=True)
     data = {s: load(s) for s in SCENARIOS}
@@ -248,6 +320,19 @@ def main() -> None:
     print(f"wrote {MEAS / 'summary.csv'}")
     for p in (plot_response_per_event(data), plot_stage_breakdown(data), plot_stage_distribution(data)):
         print(f"wrote {p}")
+
+    lab = load_lab()
+    if lab:
+        lab_summary = [summarize(name, rows, meta) for name, _, rows, meta in lab]
+        for row, (_, _, _, meta) in zip(lab_summary, lab):
+            row["fix_mask"] = meta.get("fix")
+            row["presses"] = "auto" if meta.get("inject") == "1" else "manual"
+        with (MEAS / "lab" / "summary.csv").open("w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(lab_summary[0].keys()))
+            w.writeheader()
+            w.writerows(lab_summary)
+        print(f"wrote {MEAS / 'lab' / 'summary.csv'}")
+        print(f"wrote {plot_lab_fixes(lab)}")
 
 
 if __name__ == "__main__":

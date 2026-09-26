@@ -16,4 +16,9 @@ void button_create(void);
    t0'ı HAL'in bayrak temizleme ve dağıtım kodundan önce yakalar (R-BTN-2). */
 void button_irq_entry(void);
 
+/* Lab: STOP komutu (RX kesmesi). Deneyi bitirir; ButtonTask export'u başlatır. */
+void button_request_stop_from_isr(void);
+
+#define BUTTON_CTRL_STOP_ID  0xFFFFFFFFU   /* buttonQ'da olay değil, kontrol */
+
 #endif /* BUTTON_H */

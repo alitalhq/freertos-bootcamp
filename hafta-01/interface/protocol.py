@@ -28,7 +28,7 @@ class LineFramer:
 
 @dataclass
 class Line:
-    kind: str                    # TEL, BTN, CFG, REC, TSK, CNT, END, UNKNOWN
+    kind: str                    # TEL, BTN, LAB, CFG, REC, TSK, CNT, END, UNKNOWN
     fields: list[str]
     raw: bytes
     length_ok: bool = True       # yalnızca TEL/BTN için anlamlı
@@ -37,8 +37,8 @@ class Line:
 def parse_line(raw: bytes) -> Line:
     text = raw.decode("ascii", errors="replace").rstrip("\n").rstrip()
     parts = text.split(",")
-    kind = parts[0] if parts[0] in {"TEL", "BTN", "CFG", "REC", "TSK", "CNT", "END"} else "UNKNOWN"
-    length_ok = len(raw) == MSG_LEN if kind in {"TEL", "BTN"} else True
+    kind = parts[0] if parts[0] in {"TEL", "BTN", "LAB", "CFG", "REC", "TSK", "CNT", "END"} else "UNKNOWN"
+    length_ok = len(raw) == MSG_LEN if kind in {"TEL", "BTN", "LAB"} else True
     return Line(kind, parts[1:], raw, length_ok)
 
 
