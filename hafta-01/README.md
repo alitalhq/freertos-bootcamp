@@ -115,21 +115,20 @@ pip install -r requirements.txt
 python lab_app.py
 ```
 
-- **Açılışta** resmi S0–S5 ölçümleri ve S5 çözüm denemeleri yüklü gelir. Kart bağlı olmasa da incelenebilir.
-- **Kendi deneyin:** Karta bir kez lab derlemesini yükle (`App/app_config.h` → `#define APP_LAB_MODE 1`, derle, yükle). Arayüzde bağlan, sonra seç:
-  - senaryo (S0–S5) ya da özel telemetri periyodu ve CPU işi,
-  - çözüm yolu: standart, naif, kök neden, optimal,
-  - basış kaynağı: **otomatik** (EXTI yazılım tetik) ya da **elle** (B1),
-  - olay sayısı.
+Türkçe arayüz, koyu tema (sol üstten açık temaya geçilebilir). Solda deneme listesi, sağda seçili denemenin başlığı ve tek işli sekmeler:
 
-  **Start experiment** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir.
-- **Sekmeler:**
-  - *Charts:* olay başına R ve aşama ortalamaları.
-  - *Deadline analysis:* seçilen olayın aşamaları, deadline payı ve ölçümden çıkarılan neden.
-  - *Compare:* denemeleri yan yana karşılaştırma.
-  - *Event records:* olay bazında tablo.
-  - *Counters and guide:* sayaçlar ve kullanım rehberi.
-- Kayıt: **Save CSV** (ödev formatı + meta), **Save raw session** (ham UART baytları), **Open session file** (ikisini de açar).
+| Sekme | Ne gösterir |
+|---|---|
+| **Özet** | Bir cümlelik sonuç, olay başına R grafiği, zamanın aşamalara dağılımı ve teşhis |
+| **Neden geç kaldı?** | Olay listesi (geç ve kayıp olanlar üstte). Seçilen olayın aşama dökümü, 20 ms payı ve ölçümden çıkarılan neden |
+| **Karşılaştır** | İşaretlenen denemelerin aşama ortalamaları yan yana, özet tablo |
+| **Kayıtlar** | Olay bazında tablo, kartın gönderdiği CFG/CNT/TSK değerleri |
+| **Yeni deney** | 1 · Kart, 2 · Yük (senaryo ya da özel periyot + CPU işi), 3 · Çözüm (standart / naif / kök neden / optimal), 4 · Basışlar (otomatik ya da elle, olay sayısı). **Deneyi başlat** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir. Sonuç Özet sekmesinde açılır |
+| **Rehber** | Ölçüm, S5'in neden başarısız olduğu ve çözümler |
+
+- **Açılışta** resmi S0–S5 ölçümleri ve S5 çözüm denemeleri yüklü gelir. Kart bağlı olmasa da incelenebilir.
+- **Kendi deneyin için** karta bir kez lab derlemesini yükle: `App/app_config.h` → `#define APP_LAB_MODE 1`, derle, yükle.
+- **Kayıt:** Sol alttaki **CSV kaydet** (ödev formatı + meta), **Ham kaydet** (ham UART baytları), **Aç…** (ikisini de açar).
 
 Komut satırından aynı deneyler: `python labctl.py run --preset S5 --fix optimal --inject auto`.
 

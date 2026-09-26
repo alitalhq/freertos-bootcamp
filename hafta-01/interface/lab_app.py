@@ -28,7 +28,8 @@ from PySide6.QtGui import QColor, QFont  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QAbstractItemView, QApplication, QButtonGroup, QComboBox, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QHeaderView, QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QTableWidget,
+    QGroupBox, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter,
+    QTabWidget, QTableWidget,
     QTableWidgetItem, QTextBrowser, QVBoxLayout, QWidget,
 )
 
@@ -130,8 +131,19 @@ QHeaderView::section {{ background: {t.raised}; color: {t.ink2}; border: 0; bord
     padding: 4px; }}
 QTableWidget::item:selected {{ background: {t.grid}; color: {t.ink}; }}
 QTableCornerButton::section {{ background: {t.raised}; border: 0; }}
-QProgressBar {{ background: {t.grid}; border: 0; border-radius: 3px; max-height: 6px; }}
+QHeaderView {{ background: {t.surface}; }}
+QProgressBar {{ background: {t.grid}; border: 0; border-radius: 4px; max-height: 8px; }}
 QProgressBar::chunk {{ background: {t.accent}; border-radius: 3px; }}
+QTabWidget::pane {{ border: 0; border-top: 1px solid {t.grid}; background: {t.page}; top: -1px; }}
+QTabBar::tab {{ background: transparent; color: {t.ink2}; padding: 9px 16px; margin-right: 4px;
+    border: 0; border-bottom: 2px solid transparent; font-size: 13px; }}
+QTabBar::tab:selected {{ color: {t.ink}; border-bottom: 2px solid {t.accent}; font-weight: 700; }}
+QTabBar::tab:hover {{ color: {t.ink}; }}
+QGroupBox {{ background: {t.surface}; border: 1px solid {t.grid}; border-radius: 10px; margin-top: 18px;
+    padding: 14px 12px 10px 12px; font-weight: 700; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 12px; padding: 0 4px; color: {t.ink2}; }}
+QLabel#phase {{ font-size: 20px; font-weight: 700; }}
+QLabel#press {{ font-size: 16px; font-weight: 700; color: {t.accent}; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}
 QScrollBar::handle:vertical {{ background: {t.grid}; border-radius: 5px; min-height: 30px; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
@@ -162,7 +174,8 @@ class Chart(FigureCanvasQTAgg):
         self.fig = Figure(figsize=(w, h))
         super().__init__(self.fig)
         self.setMinimumHeight(int(h * 80))
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setMinimumWidth(320)          # figsize genişliği alanı taşırmasın
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)   # genişlik alana uyar
         self._hover_pts: list[tuple[float, float, str]] = []
         self._tip = None
         self.mpl_connect("motion_notify_event", self._on_move)
@@ -325,7 +338,7 @@ class BudgetChart(Chart):
         ax.set_xlim(0, max(DEADLINE_MS, left) * 1.1)
         ax.set_ylim(-0.75, 0.6)
         ax.xaxis.set_major_formatter(TR_TICKS)
-        ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncols=4, fontsize=8, frameon=False,
+        ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncols=2, fontsize=8, frameon=False,
                   labelcolor=T.ink2)
         self.fig.tight_layout()
         self.draw_idle()
@@ -380,9 +393,9 @@ class CompareChart(Chart):
         ax.set_ylim(0, cap)
         ax.yaxis.set_major_formatter(TR_TICKS)
         ax.set_xticks(x, [short_label(r) for r in runs], fontsize=8, color=T.ink2)
-        self.fig.legend(*ax.get_legend_handles_labels(), loc="lower center", ncols=5, fontsize=8, frameon=False,
+        self.fig.legend(*ax.get_legend_handles_labels(), loc="lower center", ncols=3, fontsize=8, frameon=False,
                         labelcolor=T.ink2)
-        self.fig.tight_layout(rect=(0, 0.08, 1, 1))
+        self.fig.tight_layout(rect=(0, 0.14, 1, 1))
         self.draw_idle()
 
 
@@ -438,11 +451,25 @@ Otomatik basış EXTI13'ü yazılımla tetikler (aynı ISR ve t0 yolu); elle bas
 
 # ---- Pencere ----------------------------------------------------------------------
 
+def scroll_page(inner: QWidget) -> QScrollArea:
+    sc = QScrollArea()
+    sc.setWidgetResizable(True)
+    sc.setFrameShape(QFrame.NoFrame)
+    inner.setObjectName("page")
+    inner.setAttribute(Qt.WA_StyledBackground, True)
+    sc.setWidget(inner)
+    return sc
+
+
 class LabWindow(QMainWindow):
+    """Solda deneme listesi; sağda seçili denemenin başlığı ve tek işli sekmeler."""
+
+    TAB_SUMMARY, TAB_WHY, TAB_COMPARE, TAB_RECORDS, TAB_RUN, TAB_GUIDE = range(6)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("RTOS Lab")
-        self.resize(1400, 920)
+        self.resize(1400, 900)
         self.runs: list[Run] = default_runs()
         self.q: queue.Queue = queue.Queue()
         self.reader: SerialReader | None = None
@@ -462,7 +489,7 @@ class LabWindow(QMainWindow):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(0)
         h.addWidget(self._build_sidebar())
-        h.addWidget(self._build_report(), 1)
+        h.addWidget(self._build_main(), 1)
         self.setCentralWidget(root)
 
         self._refresh_ports()
@@ -471,16 +498,15 @@ class LabWindow(QMainWindow):
         self.timer.timeout.connect(self._poll)
         self.timer.start(50)
 
-    # ---- kenar çubuğu -------------------------------------------------------
+    # ---- sol: deneme listesi -----------------------------------------------
     def _build_sidebar(self) -> QWidget:
         side = QWidget()
         side.setObjectName("sidebar")
         side.setAttribute(Qt.WA_StyledBackground, True)
-        side.setFixedWidth(318)
+        side.setFixedWidth(290)
         v = QVBoxLayout(side)
-        v.setContentsMargins(18, 18, 18, 14)
+        v.setContentsMargins(16, 18, 16, 14)
         v.setSpacing(6)
-
         top = QHBoxLayout()
         top.addWidget(label("RTOS Lab", "brand"))
         top.addStretch(1)
@@ -490,32 +516,190 @@ class LabWindow(QMainWindow):
         top.addWidget(self.theme_btn)
         v.addLayout(top)
         v.addWidget(label("yük altında buton yanıtı · NUCLEO-L476RG", "small"))
-
-        # bağlantı
-        v.addWidget(label("KART", "section"))
+        v.addWidget(label("DENEMELER", "section"))
+        v.addWidget(label("İncelemek için bir denemeye tıkla. Mavi nokta: tüm deadline'lar tutuldu, "
+                          "kırmızı: aşan ya da kaybolan yanıt var.", "small", wrap=True))
+        self.run_list = QListWidget()
+        self.run_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.run_list.setTextElideMode(Qt.ElideRight)
+        self.run_list.itemClicked.connect(self._run_clicked)
+        v.addWidget(self.run_list, 1)
         row = QHBoxLayout()
+        for text, fn in (("Aç…", self._open_file), ("CSV kaydet", self._save_csv), ("Ham kaydet", self._save_raw)):
+            b = QPushButton(text)
+            b.clicked.connect(fn)
+            row.addWidget(b)
+        v.addLayout(row)
+        return side
+
+    # ---- sağ: başlık + sekmeler ---------------------------------------------
+    def _build_main(self) -> QWidget:
+        w = QWidget()
+        w.setObjectName("page")
+        w.setAttribute(Qt.WA_StyledBackground, True)
+        v = QVBoxLayout(w)
+        v.setContentsMargins(28, 18, 28, 10)
+        v.setSpacing(6)
+        chips = QHBoxLayout()
+        self.chip_group, self.chip_press, self.chip_fix = label("", "chip"), label("", "chip"), label("", "chip")
+        for c in (self.chip_group, self.chip_press, self.chip_fix):
+            chips.addWidget(c)
+        chips.addStretch(1)
+        v.addLayout(chips)
+        self.title = label("", "title")
+        self.conditions = label("", "muted")
+        self.metrics = label("", "metrics")
+        self.metrics.setTextFormat(Qt.RichText)
+        v.addWidget(self.title)
+        v.addWidget(self.conditions)
+        v.addWidget(self.metrics)
+        v.addSpacing(6)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._tab_summary(), "Özet")
+        self.tabs.addTab(self._tab_why(), "Neden geç kaldı?")
+        self.tabs.addTab(self._tab_compare(), "Karşılaştır")
+        self.tabs.addTab(self._tab_records(), "Kayıtlar")
+        self.tabs.addTab(self._tab_run(), "Yeni deney")
+        guide = QTextBrowser()
+        guide.setHtml(GUIDE)
+        self.tabs.addTab(guide, "Rehber")
+        v.addWidget(self.tabs, 1)
+        return w
+
+    def _tab_summary(self) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 14, 8, 8)
+        v.setSpacing(10)
+        self.headline = label("", "headline", wrap=True)
+        v.addWidget(self.headline)
+        v.addWidget(label("Olay başına yanıt süresi", "h2"))
+        v.addWidget(label("Her nokta bir buton basışı. Kareler deadline'ı aştı, ✕ hiç yanıt almadı. "
+                          "Bir noktanın üzerine gelince aşamaları görünür.", "muted", wrap=True))
+        self.resp_chart = ResponseChart(9, 3.2)
+        v.addWidget(self.resp_chart)
+        v.addWidget(label("Zaman nereye gidiyor?", "h2"))
+        row = QHBoxLayout()
+        self.stage_chart = StageChart(5.2, 2.5)
+        self.diag = QTextBrowser()
+        self.diag.setMinimumHeight(200)
+        row.addWidget(self.stage_chart, 5)
+        row.addWidget(self.diag, 4)
+        v.addLayout(row)
+        v.addStretch(1)
+        return scroll_page(page)
+
+    def _tab_why(self) -> QWidget:
+        page = QWidget()
+        h = QHBoxLayout(page)
+        h.setContentsMargins(0, 14, 8, 8)
+        left = QVBoxLayout()
+        left.addWidget(label("Olaylar", "h2"))
+        left.addWidget(label("Aşan ve kaybolanlar üstte", "small"))
+        self.event_list = QListWidget()
+        self.event_list.setFixedWidth(260)
+        self.event_list.currentRowChanged.connect(self._show_event)
+        left.addWidget(self.event_list, 1)
+        h.addLayout(left)
+        right = QVBoxLayout()
+        right.setSpacing(10)
+        right.addWidget(label("Seçili olayın süresi aşamalara bölünmüş hali", "h2"))
+        right.addWidget(label("R = görev bekleme + yanıt hazırlama + TX öncesi bekleme + UART. Kırmızı kesik çizgi "
+                              "20 ms deadline; ok ise kalan pay.", "muted", wrap=True))
+        self.budget_chart = BudgetChart(9, 2.0)
+        right.addWidget(self.budget_chart)
+        right.addWidget(label("Neden?", "h2"))
+        self.cause = label("", "", wrap=True)
+        self.cause.setTextFormat(Qt.RichText)
+        right.addWidget(self.cause)
+        right.addStretch(1)
+        h.addSpacing(16)
+        h.addLayout(right, 1)
+        return scroll_page(page)
+
+    def _tab_compare(self) -> QWidget:
+        page = QWidget()
+        h = QHBoxLayout(page)
+        h.setContentsMargins(0, 14, 8, 8)
+        left = QVBoxLayout()
+        left.addWidget(label("Hangi denemeler?", "h2"))
+        left.addWidget(label("Karşılaştırmak istediklerini işaretle", "small"))
+        self.cmp_list = QListWidget()
+        self.cmp_list.setFixedWidth(260)
+        self.cmp_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.cmp_list.itemChanged.connect(self._cmp_checked)
+        left.addWidget(self.cmp_list, 1)
+        h.addLayout(left)
+        right = QVBoxLayout()
+        right.addWidget(label("Çubuklar aşama ortalamalarını üst üste koyar, kısa çizgi en büyük R'dir. "
+                              "Deadline'ı çok aşanlar kırpılır ve değeri üstüne yazılır.", "muted", wrap=True))
+        self.cmp_chart = CompareChart(9, 3.6)
+        right.addWidget(self.cmp_chart)
+        self.cmp_table = QTableWidget()
+        self.cmp_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.cmp_table.setMinimumHeight(220)
+        self.cmp_table.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Expanding)
+        right.addWidget(self.cmp_table, 1)
+        h.addSpacing(16)
+        h.addLayout(right, 1)
+        return scroll_page(page)
+
+    def _tab_records(self) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 14, 8, 8)
+        split = QSplitter(Qt.Vertical)
+        top = QWidget()
+        tv = QVBoxLayout(top)
+        tv.setContentsMargins(0, 0, 0, 0)
+        tv.addWidget(label("Olay kayıtları", "h2"))
+        self.rec_table = QTableWidget()
+        self.rec_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        tv.addWidget(self.rec_table)
+        bottom = QWidget()
+        bv = QVBoxLayout(bottom)
+        bv.setContentsMargins(0, 0, 0, 0)
+        bv.addWidget(label("Kartın gönderdiği ayarlar ve sayaçlar", "h2"))
+        self.cnt_table = QTableWidget()
+        self.cnt_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        bv.addWidget(self.cnt_table)
+        split.addWidget(top)
+        split.addWidget(bottom)
+        split.setSizes([420, 260])
+        v.addWidget(split)
+        return page
+
+    def _tab_run(self) -> QWidget:
+        page = QWidget()
+        h = QHBoxLayout(page)
+        h.setContentsMargins(0, 14, 8, 8)
+        h.setSpacing(18)
+        form = QVBoxLayout()
+
+        # 1) kart
+        box = QGroupBox("1 · Kart")
+        g = QGridLayout(box)
         self.port_box = QComboBox()
         self.port_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         refresh = QPushButton("↻")
         refresh.setFixedWidth(34)
         refresh.setToolTip("Seri portları yenile")
         refresh.clicked.connect(self._refresh_ports)
-        row.addWidget(self.port_box)
-        row.addWidget(refresh)
-        v.addLayout(row)
-        row = QHBoxLayout()
         self.conn_btn = QPushButton("Bağlan")
         self.conn_btn.clicked.connect(self._toggle_connect)
         self.conn_label = label("● bağlı değil", "small")
-        row.addWidget(self.conn_btn)
-        row.addWidget(self.conn_label, 1)
-        v.addLayout(row)
+        g.addWidget(self.port_box, 0, 0)
+        g.addWidget(refresh, 0, 1)
+        g.addWidget(self.conn_btn, 0, 2)
+        g.addWidget(self.conn_label, 1, 0, 1, 3)
+        g.addWidget(label("Kartta lab firmware'i (APP_LAB_MODE 1) yüklü olmalı.", "small", wrap=True), 2, 0, 1, 3)
+        g.setColumnStretch(0, 1)
+        form.addWidget(box)
 
-        # deney
-        v.addWidget(label("DENEY", "section"))
-        g = QGridLayout()
-        g.setHorizontalSpacing(8)
-        g.setVerticalSpacing(6)
+        # 2) yük
+        box = QGroupBox("2 · Yük")
+        g = QGridLayout(box)
         self.preset = QComboBox()
         for k, (p, wk) in PRESETS.items():
             tel = "telemetri kapalı" if p == 0 else f"{1000 // p} Hz"
@@ -535,35 +719,35 @@ class LabWindow(QMainWindow):
         self.load_warn = label("", "warn", wrap=True)
         g.addWidget(label("Senaryo", "muted"), 0, 0)
         g.addWidget(self.preset, 0, 1)
-        g.addWidget(label("Telemetri", "muted"), 1, 0)
+        g.addWidget(label("Telemetri periyodu", "muted"), 1, 0)
         g.addWidget(self.period, 1, 1)
-        g.addWidget(label("CPU işi", "muted"), 2, 0)
+        g.addWidget(label("CPU işi / periyot", "muted"), 2, 0)
         g.addWidget(self.work, 2, 1)
         g.addWidget(self.load_label, 3, 0, 1, 2)
         g.addWidget(self.load_warn, 4, 0, 1, 2)
         g.setColumnStretch(1, 1)
-        v.addLayout(g)
+        form.addWidget(box)
 
-        v.addWidget(label("Çözüm", "muted"))
+        # 3) çözüm
+        box = QGroupBox("3 · Çözüm")
+        bv = QVBoxLayout(box)
         self.fix_box = QComboBox()
         for _, lbl, mask in FIX_PRESETS:
             self.fix_box.addItem(lbl, mask)
         self.fix_note = label("", "small", wrap=True)
-        v.addWidget(self.fix_box)
-        v.addWidget(self.fix_note)
+        bv.addWidget(self.fix_box)
+        bv.addWidget(self.fix_note)
+        form.addWidget(box)
 
-        v.addWidget(label("Basışlar", "muted"))
-        row = QHBoxLayout()
-        self.auto_rb = QRadioButton("Otomatik")
-        self.manual_rb = QRadioButton("Elle (B1)")
+        # 4) basışlar
+        box = QGroupBox("4 · Basışlar")
+        g = QGridLayout(box)
+        self.auto_rb = QRadioButton("Otomatik (kart üretir)")
+        self.manual_rb = QRadioButton("Elle (B1'e sen basarsın)")
         self.auto_rb.setChecked(True)
         grp = QButtonGroup(self)
         grp.addButton(self.auto_rb)
         grp.addButton(self.manual_rb)
-        row.addWidget(self.auto_rb)
-        row.addWidget(self.manual_rb)
-        row.addStretch(1)
-        v.addLayout(row)
         self.events = QSpinBox()
         self.events.setRange(1, 128)
         self.events.setValue(35)
@@ -572,66 +756,57 @@ class LabWindow(QMainWindow):
         self.gmin.setRange(100, 5000)
         self.gmin.setValue(500)
         self.gmin.setSuffix(" ms")
-        self.gmin.setToolTip("Otomatik basışlar arasındaki en kısa aralık")
         self.gmax = QSpinBox()
         self.gmax.setRange(100, 10000)
         self.gmax.setValue(1500)
         self.gmax.setSuffix(" ms")
-        self.gmax.setToolTip("Otomatik basışlar arasındaki en uzun aralık")
-        g2 = QGridLayout()
-        g2.setHorizontalSpacing(8)
-        g2.addWidget(label("Olay sayısı", "muted"), 0, 0)
-        g2.addWidget(self.events, 0, 1, 1, 3)
-        g2.addWidget(label("Aralık", "muted"), 1, 0)
-        g2.addWidget(self.gmin, 1, 1)
-        g2.addWidget(label("–", "muted"), 1, 2)
-        g2.addWidget(self.gmax, 1, 3)
-        g2.setColumnStretch(1, 1)
-        g2.setColumnStretch(3, 1)
-        v.addLayout(g2)
+        g.addWidget(self.auto_rb, 0, 0, 1, 2)
+        g.addWidget(self.manual_rb, 0, 2, 1, 2)
+        g.addWidget(label("Olay sayısı", "muted"), 1, 0)
+        g.addWidget(self.events, 1, 1, 1, 3)
+        g.addWidget(label("Aralık", "muted"), 2, 0)
+        g.addWidget(self.gmin, 2, 1)
+        g.addWidget(label("–", "muted"), 2, 2)
+        g.addWidget(self.gmax, 2, 3)
+        g.setColumnStretch(1, 1)
+        g.setColumnStretch(3, 1)
+        form.addWidget(box)
+        form.addStretch(1)
+        formw = QWidget()
+        formw.setLayout(form)
+        formw.setFixedWidth(430)
+        h.addWidget(formw)
 
+        # canlı durum
+        live = QVBoxLayout()
+        live.setSpacing(10)
         self.run_btn = QPushButton("▶  Deneyi başlat")
         self.run_btn.setObjectName("run")
         self.run_btn.clicked.connect(self._start)
-        v.addSpacing(4)
-        v.addWidget(self.run_btn)
         row = QHBoxLayout()
         self.stop_btn = QPushButton("Durdur ve kayıtları al")
-        self.ping_btn = QPushButton("Ping")
+        self.ping_btn = QPushButton("Kartı yokla (Ping)")
         self.stop_btn.clicked.connect(self._stop)
         self.ping_btn.clicked.connect(lambda: self._send("PING\n"))
         row.addWidget(self.stop_btn, 1)
         row.addWidget(self.ping_btn)
-        v.addLayout(row)
-
-        # canlı
-        self.phase_label = label("beklemede", "small")
+        box = QGroupBox("Canlı durum")
+        lv = QVBoxLayout(box)
+        self.phase_label = label("beklemede", "phase")
         self.progress = QProgressBar()
         self.progress.setTextVisible(False)
         self.progress.setRange(0, 35)
-        self.press_label = label("", "small")
-        self.msg_label = label("Resmi S0–S5 ölçümleri ve S5 çözüm denemeleri yüklendi. Kendi deneyin için lab "
-                               "firmware'i yüklü bir karta bağlan.", "small", wrap=True)
-        v.addWidget(self.phase_label)
-        v.addWidget(self.progress)
-        v.addWidget(self.press_label)
-        v.addWidget(self.msg_label)
-
-        # denemeler
-        v.addWidget(label("DENEMELER  ·  aç: tıkla, karşılaştır: işaretle", "section"))
-        self.run_list = QListWidget()
-        self.run_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.run_list.setTextElideMode(Qt.ElideRight)
-        self.run_list.setMinimumHeight(300)
-        self.run_list.itemClicked.connect(self._run_clicked)
-        self.run_list.itemChanged.connect(self._run_checked)
-        v.addWidget(self.run_list, 1)
-        row = QHBoxLayout()
-        for text, fn in (("Aç…", self._open_file), ("CSV kaydet", self._save_csv), ("Ham kaydet", self._save_raw)):
-            b = QPushButton(text)
-            b.clicked.connect(fn)
-            row.addWidget(b)
-        v.addLayout(row)
+        self.count_label = label("", "muted")
+        self.press_label = label("", "press")
+        self.msg_label = label("Kartı bağla, ayarları seç ve deneyi başlat. Sonuç soldaki listeye \"Bu oturum\" "
+                               "altında eklenir ve Özet sekmesinde açılır.", "muted", wrap=True)
+        for x in (self.phase_label, self.progress, self.count_label, self.press_label, self.msg_label):
+            lv.addWidget(x)
+        lv.addStretch(1)
+        live.addWidget(self.run_btn)
+        live.addLayout(row)
+        live.addWidget(box, 1)
+        h.addLayout(live, 1)
 
         self.preset.currentIndexChanged.connect(self._apply_preset)
         self.period.valueChanged.connect(self._custom_edit)
@@ -641,116 +816,7 @@ class LabWindow(QMainWindow):
         self._apply_preset()
         self._fix_changed()
         self._set_run_controls(False)
-        # Küçük ekranlarda kenar çubuğu kaydırılabilir
-        wrap = QScrollArea()
-        wrap.setWidget(side)
-        wrap.setWidgetResizable(True)
-        wrap.setFixedWidth(side.width() + 12)
-        wrap.setFrameShape(QFrame.NoFrame)
-        wrap.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        return wrap
-
-    # ---- rapor sayfası ------------------------------------------------------
-    def _build_report(self) -> QWidget:
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        page = QWidget()
-        page.setObjectName("page")
-        page.setAttribute(Qt.WA_StyledBackground, True)
-        v = QVBoxLayout(page)
-        v.setContentsMargins(34, 26, 34, 34)
-        v.setSpacing(10)
-
-        chips = QHBoxLayout()
-        self.chip_group, self.chip_press, self.chip_fix = label("", "chip"), label("", "chip"), label("", "chip")
-        for c in (self.chip_group, self.chip_press, self.chip_fix):
-            chips.addWidget(c)
-        chips.addStretch(1)
-        v.addLayout(chips)
-        self.title = label("", "title")
-        self.conditions = label("", "muted")
-        self.headline = label("", "headline", wrap=True)
-        self.metrics = label("", "metrics")
-        self.metrics.setTextFormat(Qt.RichText)
-        v.addWidget(self.title)
-        v.addWidget(self.conditions)
-        v.addSpacing(4)
-        v.addWidget(self.headline)
-        v.addWidget(self.metrics)
-        v.addWidget(rule())
-
-        v.addWidget(label("Olay başına yanıt süresi", "h2"))
-        v.addWidget(label("Her nokta bir buton basışı. Kareler deadline'ı aştı, ✕ hiç yanıt almadı. "
-                          "Aşamalarını görmek için bir noktanın üzerine gel.", "muted", wrap=True))
-        self.resp_chart = ResponseChart(9, 3.3)
-        v.addWidget(self.resp_chart)
-
-        v.addWidget(label("Zaman nereye gidiyor?", "h2"))
-        row = QHBoxLayout()
-        self.stage_chart = StageChart(5.2, 2.5)
-        self.diag = QTextBrowser()
-        self.diag.setMinimumHeight(200)
-        row.addWidget(self.stage_chart, 5)
-        row.addWidget(self.diag, 4)
-        v.addLayout(row)
-
-        v.addWidget(label("Bu olay neden geç kaldı?", "h2"))
-        row = QHBoxLayout()
-        prev_b, next_b = QPushButton("‹"), QPushButton("›")
-        prev_b.setFixedWidth(34)
-        next_b.setFixedWidth(34)
-        self.event_box = QComboBox()
-        self.event_box.setMinimumWidth(260)
-        prev_b.clicked.connect(lambda: self.event_box.setCurrentIndex(max(0, self.event_box.currentIndex() - 1)))
-        next_b.clicked.connect(lambda: self.event_box.setCurrentIndex(
-            min(self.event_box.count() - 1, self.event_box.currentIndex() + 1)))
-        self.event_box.currentIndexChanged.connect(self._show_event)
-        row.addWidget(prev_b)
-        row.addWidget(self.event_box)
-        row.addWidget(next_b)
-        row.addWidget(label("aşan ve kaybolan olaylar önce listelenir", "small"))
-        row.addStretch(1)
-        v.addLayout(row)
-        self.budget_chart = BudgetChart(9, 1.9)
-        v.addWidget(self.budget_chart)
-        self.cause = label("", "", wrap=True)
-        self.cause.setTextFormat(Qt.RichText)
-        v.addWidget(self.cause)
-        v.addWidget(rule())
-
-        v.addWidget(label("Denemeleri karşılaştır", "h2"))
-        v.addWidget(label("Soldaki listede işaretli denemeler. Çubuklar aşama ortalamalarını üst üste koyar; çizgi en "
-                          "büyük R. Deadline'ı çok aşan denemeler kırpılır ve değeri yazılır.", "muted", wrap=True))
-        self.cmp_chart = CompareChart(9, 3.6)
-        v.addWidget(self.cmp_chart)
-        self.cmp_table = QTableWidget()
-        self.cmp_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.cmp_table.setMinimumHeight(240)
-        v.addWidget(self.cmp_table)
-        v.addWidget(rule())
-
-        v.addWidget(label("Olay kayıtları", "h2"))
-        self.rec_table = QTableWidget()
-        self.rec_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.rec_table.setMinimumHeight(320)
-        v.addWidget(self.rec_table)
-
-        v.addWidget(label("Sayaçlar ve nasıl çalışır", "h2"))
-        row = QHBoxLayout()
-        self.cnt_table = QTableWidget()
-        self.cnt_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.cnt_table.setMinimumHeight(300)
-        guide = QTextBrowser()
-        guide.setHtml(GUIDE)
-        guide.setMinimumHeight(300)
-        row.addWidget(self.cnt_table, 2)
-        row.addWidget(guide, 3)
-        v.addLayout(row)
-
-        scroll.setWidget(page)
-        self.scroll = scroll
-        return scroll
+        return scroll_page(page)
 
     # ---- tema -----------------------------------------------------------------
     def _toggle_theme(self):
@@ -798,7 +864,7 @@ class LabWindow(QMainWindow):
     def _fix_changed(self):
         mask = self.fix_box.currentData()
         bits = ", ".join(v for b, v in FIX_BITS.items() if mask & b) or "ödev tasarımı, değişiklik yok"
-        self.fix_note.setText(f"maske 0x{mask:X}: {bits}")
+        self.fix_note.setText(bits)
 
     def _press_mode_changed(self):
         auto = self.auto_rb.isChecked()
@@ -813,7 +879,10 @@ class LabWindow(QMainWindow):
     def _refresh_ports(self):
         cur = self.port_box.currentText()
         self.port_box.clear()
-        self.port_box.addItems(list_ports())
+        ports = list_ports()
+        self.port_box.addItems(ports)
+        self.port_box.setPlaceholderText("kart bulunamadı: USB'yi tak, ↻'ye bas")
+        self.conn_btn.setEnabled(bool(ports) or self.reader is not None)
         if cur:
             self.port_box.setCurrentText(cur)
 
@@ -833,11 +902,11 @@ class LabWindow(QMainWindow):
         self.reader.start()
         self.sess = Session()
         self.conn_btn.setText("Bağlantıyı kes")
-        self.conn_label.setText(f"● {Path(port).name}")
+        self.conn_label.setText(f"● bağlı: {Path(port).name}")
         self.conn_label.setStyleSheet(f"color: {T.ok};")
         self._set_run_controls(True)
         self._send("PING\n")
-        self._say("Bağlandı. Kartın lab durumu soruldu…")
+        self._say("Bağlandı. Kartın durumu soruldu…")
 
     def _disconnect(self):
         if self.reader:
@@ -902,11 +971,10 @@ class LabWindow(QMainWindow):
         self.sess.new_lab.clear()
         for event_id, _ in self.sess.new_btn:
             self.press_label.setText(f"Butona basıldı · olay {event_id}")
-            self.press_label.setStyleSheet(f"color: {T.accent}; font-weight: 700;")
             self.flash_until = time.monotonic() + 0.6
         self.sess.new_btn.clear()
         if self.flash_until and time.monotonic() > self.flash_until:
-            self.press_label.setStyleSheet("")
+            self.press_label.setText("")
             self.flash_until = 0.0
         if self.sess.collector.active and self.phase not in ("EXPORT", "IDLE"):
             self._set_phase("EXPORT")
@@ -927,20 +995,20 @@ class LabWindow(QMainWindow):
                "EXPORT": "kayıtlar alınıyor…"}.get(self.phase, "")
         if self.phase == "WARMUP":
             txt = f"ısınma · {num(max(0.0, WARMUP_S - el), 1)} s"
+        self.phase_label.setText(txt)
         target = self.pending_cfg.target if self.pending_cfg else 0
         if self.phase in ("RUNNING", "WARMUP", "EXPORT"):
-            txt += f"  ·  {self.sess.btn_count}/{target} basış  ·  {self.sess.tel_count} TEL"
+            self.count_label.setText(f"{self.sess.btn_count} / {target} basış   ·   {self.sess.tel_count} telemetri mesajı")
             self.progress.setValue(min(self.sess.btn_count, target))
-        self.phase_label.setText(txt)
 
     def _on_lab_line(self, line: str):
         parts = line.split(",")
         if self.phase == "SENT":
             self._set_phase("WARMUP")
             self.sess.tel_count = self.sess.btn_count = 0
-            self._say(f"Kart {parts[2]} olarak yeniden başladı ({' '.join(parts[3:])}).")
+            self._say(f"Kart {parts[2]} ayarıyla yeniden başladı ({' '.join(parts[3:])}).")
         else:
-            self._say(f"Kart: {line}")
+            self._say(f"Kart hazır: {line}")
 
     def _on_export(self, exp):
         cfg = self.pending_cfg
@@ -950,15 +1018,16 @@ class LabWindow(QMainWindow):
         self.compare_keys.add(run.key)
         self._fill_run_list(select=run.key)
         self._set_phase("IDLE")
-        self._say(f"Kayıtlar alındı ({run.stat()['n']} olay). Saklamak için CSV ve ham oturumu kaydet.")
+        self._say(f"Kayıtlar alındı ({run.stat()['n']} olay) ve Özet sekmesinde açıldı. Saklamak için soldan "
+                  "CSV ve ham oturumu kaydet.")
+        self.tabs.setCurrentIndex(self.TAB_SUMMARY)
 
     def _say(self, text: str, error: bool = False):
         self.msg_label.setText(text)
         self.msg_label.setStyleSheet(f"color: {T.critical};" if error else "")
 
-    # ---- deneme listesi ---------------------------------------------------
+    # ---- deneme listeleri --------------------------------------------------
     def _fill_run_list(self, select: str | None = None):
-        self.run_list.blockSignals(True)
         self.run_list.clear()
         group = None
         for r in self.runs:
@@ -976,37 +1045,46 @@ class LabWindow(QMainWindow):
             good = st["late"] == 0 and st["lost"] == 0
             it = QListWidgetItem(f"●  {r.label}")
             it.setData(Qt.UserRole, r.key)
-            it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsUserCheckable)
-            it.setCheckState(Qt.Checked if r.key in self.compare_keys else Qt.Unchecked)
             it.setForeground(QColor(T.ok if good else T.critical))
             it.setToolTip(f"{'tüm deadline tutuldu' if good else 'aşan ya da kaybolan yanıt var'}\n"
                           f"{r.conditions()}\nen büyük R {num(st['max'] or 0, 1)} ms · {st['late']} aşan · "
                           f"{st['lost']} kayıp")
             self.run_list.addItem(it)
-        self.run_list.blockSignals(False)
         key = select or self.current_key or (self.runs[0].key if self.runs else None)
         for i in range(self.run_list.count()):
             if self.run_list.item(i).data(Qt.UserRole) == key:
                 self.run_list.setCurrentRow(i)
         self._show_run(key)
+        self._fill_compare_list()
+
+    def _fill_compare_list(self):
+        self.cmp_list.blockSignals(True)
+        self.cmp_list.clear()
+        for r in self.runs:
+            it = QListWidgetItem(r.label)
+            it.setData(Qt.UserRole, r.key)
+            it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+            it.setCheckState(Qt.Checked if r.key in self.compare_keys else Qt.Unchecked)
+            self.cmp_list.addItem(it)
+        self.cmp_list.blockSignals(False)
         self._update_compare()
 
     def _run_clicked(self, item: QListWidgetItem):
         key = item.data(Qt.UserRole)
         if key:
             self._show_run(key)
+            if self.tabs.currentIndex() in (self.TAB_RUN, self.TAB_GUIDE):
+                self.tabs.setCurrentIndex(self.TAB_SUMMARY)
 
-    def _run_checked(self, item: QListWidgetItem):
+    def _cmp_checked(self, item: QListWidgetItem):
         key = item.data(Qt.UserRole)
-        if not key:
-            return
         (self.compare_keys.add if item.checkState() == Qt.Checked else self.compare_keys.discard)(key)
         self._update_compare()
 
     def current_run(self) -> Run | None:
         return next((r for r in self.runs if r.key == self.current_key), None)
 
-    # ---- rapor ------------------------------------------------------------
+    # ---- seçili denemeyi göster ------------------------------------------------
     def _show_run(self, key: str | None):
         run = next((r for r in self.runs if r.key == key), None)
         if run is None:
@@ -1024,10 +1102,9 @@ class LabWindow(QMainWindow):
         self.metrics.setText(
             f"yanıt <span style='{bad(st['ok'] < st['n'])}'>{st['ok']}/{st['n']}</span>{sep}"
             f"ortalama <span style='{bad((st['avg'] or 0) > DEADLINE_MS)}'>{num(st['avg'])}</span> ms{sep}"
-            f"p95 <span style='{bad((st['p95'] or 0) > DEADLINE_MS)}'>{num(st['p95'])}</span> ms{sep}"
             f"en büyük <span style='{bad((st['max'] or 0) > DEADLINE_MS)}'>{num(st['max'])}</span> ms{sep}"
             f"20 ms aşan <span style='{bad(st['late'])}'>{st['late']}</span>{sep}"
-            f"kayıp yanıt / TEL <span style='{bad(st['lost'])}'>{st['lost']} / {st['tel_lost']}</span>")
+            f"kayıp yanıt <span style='{bad(st['lost'])}'>{st['lost']}</span>")
         self.resp_chart.show(run)
         self.stage_chart.show(run)
         self._fill_diag(run)
@@ -1051,10 +1128,6 @@ class LabWindow(QMainWindow):
         if slope is not None:
             lines.append(f"TX öncesi bekleme eğilimi: <b>olay başına {num(slope)} ms</b> "
                          + ("— birikim her basışta büyüyor." if slope > 1 else "— birikim yok."))
-        counts = run.cause_counts()
-        if counts:
-            lines.append("Aşan ya da kaybolan olaylar, baskın aşamaya göre: " +
-                         ", ".join(f"<b>{k}</b> {v}" for k, v in sorted(counts.items(), key=lambda kv: -kv[1])))
         if run.cnt.get("txq_hwm"):
             lines.append(f"txQ en yüksek doluluk {run.cnt['txq_hwm']}/16 · kayıp telemetri "
                          f"{run.cnt.get('tel_tx_drop', 0)}")
@@ -1062,15 +1135,21 @@ class LabWindow(QMainWindow):
 
     def _fill_events(self, run: Run):
         self._events = sorted(run.events, key=lambda e: (e.ok and not e.late, e.rec.event_id))
-        self.event_box.blockSignals(True)
-        self.event_box.clear()
+        self.event_list.blockSignals(True)
+        self.event_list.clear()
         for e in self._events:
             if not e.ok:
-                self.event_box.addItem(f"olay {e.rec.event_id} · ✕ {STATUS_TR.get(e.rec.status, e.rec.status)}")
+                text, col = f"olay {e.rec.event_id:<3} ✕ yanıt yok", T.critical
+            elif e.late:
+                text, col = f"olay {e.rec.event_id:<3} {num(e.r_ms):>7} ms  aştı", T.critical
             else:
-                self.event_box.addItem(f"olay {e.rec.event_id} · {num(e.r_ms)} ms" + ("  · aştı" if e.late else ""))
-        self.event_box.blockSignals(False)
-        self.event_box.setCurrentIndex(0)
+                text, col = f"olay {e.rec.event_id:<3} {num(e.r_ms):>7} ms", T.ink2
+            it = QListWidgetItem(text)
+            it.setForeground(QColor(col))
+            it.setFont(QFont("Menlo", 11))
+            self.event_list.addItem(it)
+        self.event_list.blockSignals(False)
+        self.event_list.setCurrentRow(0)
         self._show_event(0)
 
     def _show_event(self, idx: int):
@@ -1121,20 +1200,19 @@ class LabWindow(QMainWindow):
     def _update_compare(self):
         runs = [r for r in self.runs if r.key in self.compare_keys]
         self.cmp_chart.show(runs)
-        cols = ["deneme", "koşullar", "yanıt", "ort. R", "p95 R", "en büyük R", "aşan", "kayıp BTN", "kayıp TEL",
-                "txQ max"] + [lb.split(" (")[0] for _, lb, *_ in STAGES]
+        cols = ["deneme", "koşullar", "yanıt", "ort. R", "en büyük R", "aşan", "kayıp", "txQ max"] + \
+               [lb.split(" (")[0] for _, lb, *_ in STAGES]
         t = self.cmp_table
         t.setColumnCount(len(cols))
         t.setHorizontalHeaderLabels(cols)
         t.setRowCount(len(runs))
         for i, r in enumerate(runs):
             st, sm = r.stat(), r.stage_means()
-            vals = [r.label, r.conditions(), f"{st['ok']}/{st['n']}", num(st["avg"]), num(st["p95"]), num(st["max"]),
-                    str(st["late"]), str(st["lost"]), str(st["tel_lost"]), r.cnt.get("txq_hwm", "")] + \
-                   [num(sm[k]) for k, *_ in STAGES]
+            vals = [r.label, r.conditions(), f"{st['ok']}/{st['n']}", num(st["avg"]), num(st["max"]),
+                    str(st["late"]), str(st["lost"]), r.cnt.get("txq_hwm", "")] + [num(sm[k]) for k, *_ in STAGES]
             for j, val in enumerate(vals):
                 it = QTableWidgetItem(val)
-                if j in (5, 6) and st["late"]:
+                if j in (4, 5) and st["late"]:
                     it.setForeground(QColor(T.critical))
                 t.setItem(i, j, it)
         t.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -1171,7 +1249,7 @@ class LabWindow(QMainWindow):
                                   [f"CNT,{k}={v}" for k, v in run.cnt.items()] +
                                   [f"TSK,{t['name']},prio={t.get('prio')},stack_hwm_words={t.get('stack_hwm_words')}"
                                    for t in run.tasks]) + "\n")
-        self._say(f"{Path(path).name} ve {meta.name} kaydedildi.")
+        QMessageBox.information(self, "RTOS Lab", f"{Path(path).name} ve {meta.name} kaydedildi.")
 
     def _save_raw(self):
         run = self.current_run()
@@ -1182,7 +1260,7 @@ class LabWindow(QMainWindow):
                                               f"{run.cfg.get('scenario', 'deneme')}_ham.bin", "Ham UART (*.bin)")
         if path:
             Path(path).write_bytes(run.raw)
-            self._say(f"Ham UART oturumu kaydedildi ({len(run.raw)} bayt).")
+            QMessageBox.information(self, "RTOS Lab", f"Ham UART oturumu kaydedildi ({len(run.raw)} bayt).")
 
     def closeEvent(self, ev):
         if self.reader:
