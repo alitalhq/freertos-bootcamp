@@ -242,7 +242,8 @@ def plot_stage_distribution(data: dict) -> Path:
 # ---------------------------------------------------- standart dışı ek deney --
 
 LAB_ORDER = [("S5a", "standard"), ("S5-F4a", "naive:\nButtonTask prio"),
-             ("S5-F1a", "root cause:\nUART prio"), ("S5-F5a", "optimal:\nUART + Button prio")]
+             ("S5-F1a", "root cause:\nUART prio"), ("S5-F8a", "no priority change:\nTC chain"),
+             ("S5-F5a", "optimal:\nUART + Button prio")]
 
 
 def load_lab() -> list[tuple[str, str, list[dict], dict]]:

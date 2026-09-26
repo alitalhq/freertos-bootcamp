@@ -37,5 +37,5 @@ Kontroller sırasında birkaç öneri ya da iddia yanlış çıktı ve düzeltil
 
 Tasarım kararları da öneriler arasından seçildi ya da değiştirildi:
 - Zorunlu S0–S5 ölçümleri standart ayarlarla alındı. Çözüm denemeleri ayrı bir derlemeye (`APP_LAB_MODE`) ayrıldı.
-- Yedi çözüm varyantından tekrar edenler çıkarıldı, dört tanesi tutuldu.
+- Yedi çözüm varyantından tekrar edenler çıkarıldı, beş tanesi tutuldu. Öncelik değiştirmeyen TC zinciri, eğitmenin ipucu üzerine yeniden ölçülüp geri eklendi.
 - Arayüz birkaç kez yeniden düzenlendi: önce referanstan farklı bir düzen, sonra Türkçe metinler ve koyu tema, en son tek işli sekmeler.

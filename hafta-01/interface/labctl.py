@@ -20,10 +20,12 @@ from monitor import DEFAULT_OUT, SerialReader, Session, list_ports, save_export,
 # ---- Çözüm bitleri (app_config.h ile aynı) ---------------------------------
 FIX_UART_PRIO = 0x1   # F1: UartTxTask önceliği 4 (kök neden)
 FIX_BTN_PRIO = 0x4    # F4: ButtonTask önceliği 4 (tek başına naif, F1 ile optimal)
+FIX_TC_CHAIN = 0x8    # F8: sonraki gönderim TC kesmesinden (öncelikler değişmez)
 
 FIX_BITS = {
     FIX_UART_PRIO: "UartTxTask önceliği 1→4",
     FIX_BTN_PRIO: "ButtonTask önceliği 2→4",
+    FIX_TC_CHAIN: "sonraki gönderim TC kesmesinden (öncelikler aynı)",
 }
 
 # Arayüzde gösterilen hazır çözüm seçenekleri: (anahtar, etiket, maske)
@@ -31,6 +33,7 @@ FIX_PRESETS = [
     ("standard", "Standart (ödev tasarımı, yükte hatalı)", 0),
     ("naive", "Naif: ButtonTask önceliğini artır", FIX_BTN_PRIO),
     ("root", "Kök neden: UART görevinin önceliği", FIX_UART_PRIO),
+    ("chain", "Öncelik değiştirmeden: TC zinciri", FIX_TC_CHAIN),
     ("optimal", "Optimal: UART ve Button görevleri CPU işinin üstünde", FIX_UART_PRIO | FIX_BTN_PRIO),
 ]
 FIX_BY_KEY = {k: m for k, _, m in FIX_PRESETS}

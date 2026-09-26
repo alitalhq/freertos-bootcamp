@@ -165,11 +165,14 @@ Tahmin etmediğimiz iki şey vardı. Birincisi, gecikmenin **her basışla birik
 | Standart (ödev), otomatik basış | 24/35 | 117,2 | 164,7 | 24 | 9 | 16 |
 | F4: ButtonTask önceliği 4 (naif) | 35/35 | 128,8 | 164,7 | **34** | 20 | 16 |
 | **F1: UartTxTask önceliği 4 (kök neden)** | **35/35** | **11,0** | **16,3** | **0** | 0 | 1 |
+| **F8: TC zinciri (öncelikler değişmez)** | **35/35** | **11,0** | **16,4** | **0** | 0 | 2 |
 | **F1 + F4: yanıt yolu CPU işinin üstünde** | **35/35** | **7,2** | **10,3** | **0** | 0 | 1 |
 
 R değerleri ms cinsinden. Tam tablo: [`measurements/lab/summary.csv`](../measurements/lab/summary.csv).
 
-**Hipotez testi.** §4.4'teki açıklama "gecikmenin nedeni UART görevinin CPU alamaması" diyordu. Bunu doğrulamak için **yalnızca** UART görevinin önceliğini değiştirdik (F1). Birikim tamamen kayboldu: txQ max 16'dan 1'e indi, TX öncesi beklemenin eğimi olay başına +3,4 ms'den (standart, otomatik basış) +0,03 ms'ye düştü, kayıp sıfırlandı. (Öncelik değiştirmeden, sıradaki gönderimi TC kesmesinden başlatan bir varyant da aynı sonucu verdi. Tekrar ettiği için kaldırıldı; bkz. ADR-004.)
+**Hipotez testi.** §4.4'teki açıklama "gecikmenin nedeni UART görevinin CPU alamaması" diyordu. Bunu doğrulamak için **yalnızca** UART görevinin önceliğini değiştirdik (F1). Birikim tamamen kayboldu: txQ max 16'dan 1'e indi, TX öncesi beklemenin eğimi olay başına +3,4 ms'den (standart, otomatik basış) +0,03 ms'ye düştü, kayıp sıfırlandı.
+
+**Öncelik değiştirmeden çözüm (F8).** Görev öncelikleri 3 > 2 > 1 kalırken de aynı sonuç alınabiliyor. Sıradaki mesajı UartTxTask yerine TC kesmesinin kendisi kuyruktan alıp başlatıyor. Kesme, görev önceliklerinden bağımsız olarak hemen çalıştığı için hat boşta beklemiyor. 35 yanıtın hepsi geldi, en büyük R 16,4 ms. Kök neden böylece ikinci, bağımsız bir yoldan da doğrulandı. Telemetriye etkisi F1'den küçük: ortalama iş 5 054 µs, F1'de 5 086 µs. Görev beklemesi (≤ 5 ms) ise kalıyor, çünkü ButtonTask hâlâ CPU işinin altında.
 
 **Naif çözüm neden işe yaramadı?** Teknik sunumdaki *"İlk değişikliğiniz ne olurdu? A: Görevin önceliğini yükseltirim"* sorusunun ölçülmüş cevabı bu. ButtonTask'ı yükseltmek görev beklemesini sıfırladı (t₁−t₀ ort. 0,03 ms), ama ortalama gecikmenin %96'sı TX öncesi beklemedeydi. 34/35 yanıt yine geç geldi. Yanıtlar kuyruğa artık TEL'den önce girdiği için BTN kaybı sıfırlandı, onun yerine 20 TEL kayboldu. Ölçmeden önce ilk yapılacak iş, gecikme bileşenlerini ayırmaktı (sunumdaki C seçeneği).
 

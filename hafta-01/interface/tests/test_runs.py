@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from labctl import FIX_BTN_PRIO, FIX_PRESETS, FIX_UART_PRIO, LabConfig, fix_label  # noqa: E402
+from labctl import FIX_BTN_PRIO, FIX_PRESETS, FIX_TC_CHAIN, FIX_UART_PRIO, LabConfig, fix_label  # noqa: E402
 from runs import default_runs  # noqa: E402
 
 RUNS = {r.cfg.get("scenario") + ("/official" if r.official else ""): r for r in default_runs()}
@@ -12,9 +12,10 @@ RUNS = {r.cfg.get("scenario") + ("/official" if r.official else ""): r for r in 
 def test_defaults_include_official_and_lab_runs():
     assert {f"S{i}/official" for i in range(6)} <= set(RUNS)
     assert {"S5a", "S5-F1a", "S5-F4a", "S5-F5a"} <= set(RUNS)
-    assert [m for _, _, m in FIX_PRESETS] == [0, FIX_BTN_PRIO, FIX_UART_PRIO, FIX_UART_PRIO | FIX_BTN_PRIO]
+    assert [m for _, _, m in FIX_PRESETS] == [0, FIX_BTN_PRIO, FIX_UART_PRIO, FIX_TC_CHAIN,
+                                              FIX_UART_PRIO | FIX_BTN_PRIO]
     lab_runs = [r for r in RUNS.values() if not r.official]
-    assert sorted(r.fix for r in lab_runs) == [0, 1, 4, 5]    # yalnızca 4 çözüm
+    assert sorted(r.fix for r in lab_runs) == [0, 1, 4, 5, 8]    # 5 çözüm
 
 
 def test_official_s5_is_diagnosed_as_uart_starvation():
@@ -33,6 +34,14 @@ def test_root_fix_removes_starvation_and_backlog():
     assert not f1.uart_starved()
     assert abs(f1.backlog_slope_ms_per_event()) < 0.5
     assert f1.stat()["late"] == 0 and f1.stat()["lost"] == 0
+
+
+def test_tc_chain_fixes_backlog_without_priority_change():
+    chain = RUNS["S5-F8a"]
+    assert not chain.uart_starved()
+    assert chain.stat()["late"] == 0 and chain.stat()["lost"] == 0
+    prios = {t["name"]: t["prio"] for t in chain.tasks}
+    assert (prios["telemetry"], prios["button"], prios["uart_tx"]) == ("3", "2", "1")
 
 
 def test_naive_fix_alone_keeps_backlog():

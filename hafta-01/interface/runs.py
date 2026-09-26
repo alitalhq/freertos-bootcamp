@@ -134,7 +134,7 @@ class Run:
         if self.period_ms == 0 or self.work_us == 0:
             return False
         free_ms = self.period_ms - self.work_us / 1000
-        return free_ms < LINE_MS and not (self.fix & 0x1)
+        return free_ms < LINE_MS and not (self.fix & 0x1) and not (self.fix & 0x8)
 
     # ---- nedenler --------------------------------------------------------
     def diagnose(self, ev: Event) -> tuple[str, str]:
@@ -259,7 +259,7 @@ def default_runs() -> list[Run]:
             runs.append(load_csv(p, GROUP_OFFICIAL, f"{s} · resmi"))
     lab = meas / "lab"
     if lab.exists():
-        order = {0: 0, 4: 1, 1: 2, 5: 3}
+        order = {0: 0, 4: 1, 1: 2, 8: 3, 5: 4}
         labs = [load_csv(p, GROUP_LAB) for p in sorted(lab.glob("*.csv")) if is_record_csv(p)]
         labs.sort(key=lambda r: (r.period_ms, r.work_us, order.get(r.fix, 99)))
         for r in labs:

@@ -42,6 +42,7 @@ Kök neden ölçümle doğrulandı ve giderildi ([rapor §8](analysis/report.md#
 | Standart (ödev) | 24/35 | 164,7 ms | 24 |
 | Naif: ButtonTask önceliği ↑ | 35/35 | 164,7 ms | **34** |
 | Kök neden: UartTxTask önceliği ↑ | 35/35 | 16,3 ms | 0 |
+| Öncelik değiştirmeden: TC zinciri | 35/35 | 16,4 ms | 0 |
 | **Optimal: UartTxTask + ButtonTask, CPU işinin üstünde** | **35/35** | **10,3 ms** | **0** |
 
 Bu sonuçlar lab derlemesiyle (`APP_LAB_MODE 1`) alındı. Zorunlu S0–S5 ölçümleri standart derlemeyle alındı ve bu ek deneyden etkilenmiyor.
@@ -127,7 +128,7 @@ Türkçe arayüz, koyu tema (sol üstten açık temaya geçilebilir). Solda dene
 | **Neden geç kaldı?** | Olay listesi (geç ve kayıp olanlar üstte). Seçilen olayın aşama dökümü, 20 ms payı ve ölçümden çıkarılan neden |
 | **Karşılaştır** | İşaretlenen denemelerin aşama ortalamaları yan yana, özet tablo |
 | **Kayıtlar** | Olay bazında tablo, kartın gönderdiği CFG/CNT/TSK değerleri |
-| **Yeni deney** | 1 · Kart, 2 · Yük (senaryo ya da özel periyot + CPU işi), 3 · Çözüm (standart / naif / kök neden / optimal), 4 · Basışlar (otomatik ya da elle, olay sayısı). **Deneyi başlat** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir. Sonuç Özet sekmesinde açılır |
+| **Yeni deney** | 1 · Kart, 2 · Yük (senaryo ya da özel periyot + CPU işi), 3 · Çözüm (standart / naif / kök neden / TC zinciri / optimal), 4 · Basışlar (otomatik ya da elle, olay sayısı). **Deneyi başlat** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir. Sonuç Özet sekmesinde açılır |
 | **Rehber** | Ölçüm, S5'in neden başarısız olduğu ve çözümler |
 
 - **Açılışta** resmi S0–S5 ölçümleri ve S5 çözüm denemeleri yüklü gelir. Kart bağlı olmasa da incelenebilir.

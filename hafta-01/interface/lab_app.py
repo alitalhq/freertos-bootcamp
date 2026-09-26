@@ -344,7 +344,7 @@ class BudgetChart(Chart):
         self.draw_idle()
 
 
-SHORT_FIX = {0: "standart", 4: "naif", 1: "kök neden", 5: "optimal"}
+SHORT_FIX = {0: "standart", 4: "naif", 1: "kök neden", 8: "TC zinciri", 5: "optimal"}
 
 
 def short_label(run: Run) -> str:
@@ -437,8 +437,9 @@ UART + TC (hatta 5,56 ms).</p>
 görevi yalnızca kalan ~4,95 ms'de mesaj başlatabiliyor; mesaj ise 5,56 ms sürüyor. Hat periyot başına en fazla
 bir mesaj taşıyor, bu da telemetri hızına eşit. Her yanıt hiç erimeyen bir mesaj ekliyor.</p>
 <p><b>Çözümler</b> (lab firmware'i, her biri kendi <code>#ifdef</code> bloğunda): naif ButtonTask önceliği
-(tek başına işe yaramaz: nedeni başka yerde) · <b>kök neden: UART görevinin önceliği</b> · <b>optimal: UART ve
-Button görevleri CPU işinin üstünde</b>.</p>
+(tek başına işe yaramaz: nedeni başka yerde) · <b>kök neden: UART görevinin önceliği</b> · <b>öncelik
+değiştirmeden: TC zinciri</b> (sıradaki mesajı TC kesmesi başlatır; öncelikler 3 &gt; 2 &gt; 1 kalır) ·
+<b>optimal: UART ve Button görevleri CPU işinin üstünde</b>.</p>
 <p><b>CPU işini kesmek hata mı?</b> Öncelik "ne kadar önemli"ye değil "ne kadar acil ve kısa"ya göre verilir.
 Üste alınan görevler mesaj/basış başına yalnızca onlarca µs sürer ve sınırlıdır (basış en fazla ~33/s, mesaj
 ~180/s); CPU işi periyotta ~36 µs uzar ve yine 10 ms'ye rahat sığar. Üstelik UART artık aç kalmadığı için
