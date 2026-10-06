@@ -62,9 +62,19 @@ static void export_cfg(void)
     kv(&b, "deadline_us", DEADLINE_US);
     send(&b);
 
+    begin(&b, "CFG,variant=");
+    const char v[2] = { (char)sc->variant, '\0' };
+    tb_put_str(&b, v);
+    kv(&b, "burst", sc->burst);
+    kv(&b, "prio_tel", PRIO_TELEMETRY);
+    kv(&b, "prio_btn", (sc->variant == 'A') ? PRIO_BUTTON_A : PRIO_BUTTON_BC);
+    kv(&b, "prio_tx", PRIO_UART_TX);
+    send(&b);
+
     begin(&b, "CFG");
     kv(&b, "msg_len", MSG_LEN);
-    kv(&b, "txq_len", TX_QUEUE_LEN);
+    kv(&b, "tx_pending_max", TX_PENDING_MAX);
+    kv(&b, "btn_first", (uint32_t)variant_btn_first(sc));
     kv(&b, "btnq_len", BUTTON_QUEUE_LEN);
     send(&b);
 
@@ -75,18 +85,14 @@ static void export_cfg(void)
     kv(&b, "work_iters", wc->work_iters);
     send(&b);
 
-    /* Standart dışı ayarlar: resmi derlemede lab=0, fix=0, inject=0. */
+    /* Basış kaynağı: inject=0 fiziksel B1, 1 otomatik (EXTI yazılım tetik). */
     begin(&b, "CFG");
-    kv(&b, "lab", APP_LAB_MODE);
-    kv(&b, "fix", sc->fix_mask);
     kv(&b, "inject", sc->inject);
-#if APP_LAB_MODE
     kv(&b, "gap_min_ms", sc->gap_min_ms);
     kv(&b, "gap_max_ms", sc->gap_max_ms);
     kv(&b, "seed", sc->seed);
     kv(&b, "run", sc->run_id);
     kv(&b, "injected", lab_injected_count());
-#endif
     send(&b);
 }
 
@@ -182,6 +188,17 @@ static void export_counters(void)
         kv(&b, "work_min_us", g_stats.work_min_us);
         kv(&b, "work_avg_us", g_stats.work_sum_us / g_stats.work_n);
         kv(&b, "work_max_us", g_stats.work_max_us);
+    }
+    send(&b);
+
+    /* TEL kuyruk beklemesi: kuyruğa giriş -> gönderim başlangıcı. */
+    begin(&b, "CNT");
+    kv(&b, "tel_wait_n", g_stats.tel_wait_n);
+    if (g_stats.tel_wait_n > 0U)
+    {
+        kv(&b, "tel_wait_min_us", g_stats.tel_wait_min_us);
+        kv(&b, "tel_wait_avg_us", (uint32_t)(g_stats.tel_wait_sum_us / g_stats.tel_wait_n));
+        kv(&b, "tel_wait_max_us", g_stats.tel_wait_max_us);
     }
     send(&b);
 }

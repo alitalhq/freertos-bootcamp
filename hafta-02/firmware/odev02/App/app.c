@@ -22,7 +22,5 @@ void app_create_tasks(void)
     uart_tx_create();
     button_create();
     telemetry_create();
-#if APP_LAB_MODE
     lab_create_tasks();                   /* otomatik basış (inject=1 ise) */
-#endif
 }

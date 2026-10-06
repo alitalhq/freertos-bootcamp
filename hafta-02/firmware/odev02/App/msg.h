@@ -9,13 +9,15 @@ typedef enum {
     MSG_TEL = 0,
     MSG_BTN = 1,
     MSG_CTRL_EXPORT = 2,   /* veri değil: UartTxTask'a "export et" işareti */
+    MSG_INFO = 3,          /* LAB satırı: gönderilir ama TEL istatistiğine girmez */
 } MsgType;
 
-/* txQ elemanı: kuyruğa DEĞER olarak kopyalanır (R-Q-2). data NUL ile
-   bitmez; her zaman tam MSG_LEN bayt gönderilir. */
+/* tx_q / urgent_q elemanı: kuyruğa DEĞER olarak kopyalanır (R-Q-2). data
+   NUL ile bitmez; her zaman tam MSG_LEN bayt gönderilir. */
 typedef struct {
     uint8_t  type;          /* MsgType */
     uint32_t event_id;      /* BTN için olay kimliği, TEL için sıra no */
+    uint32_t enq_us;        /* kuyruğa girdiği an (TEL bekleme istatistiği) */
     char     data[MSG_LEN];
 } TxMsg;
 

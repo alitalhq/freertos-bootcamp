@@ -9,14 +9,14 @@ typedef struct {
     uint32_t t0;
 } ButtonEvent;
 
-/* buttonQ'yu ve ButtonTask'ı oluşturur (öncelik 2). */
+/* buttonQ'yu ve ButtonTask'ı oluşturur (A: öncelik 2, B/C: 4). */
 void button_create(void);
 
 /* stm32l4xx_it.c -> EXTI15_10_IRQHandler'ın İLK satırı (USER CODE 0).
    t0'ı HAL'in bayrak temizleme ve dağıtım kodundan önce yakalar (R-BTN-2). */
 void button_irq_entry(void);
 
-/* Lab: STOP komutu (RX kesmesi). Deneyi bitirir; ButtonTask export'u başlatır. */
+/* STOP komutu (RX kesmesi). Deneyi bitirir; ButtonTask export'u başlatır. */
 void button_request_stop_from_isr(void);
 
 #define BUTTON_CTRL_STOP_ID  0xFFFFFFFFU   /* buttonQ'da olay değil, kontrol */

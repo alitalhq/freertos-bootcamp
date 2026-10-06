@@ -27,6 +27,7 @@ static void TelemetryTask(void *arg)
 
     const uint32_t iters = workload_calib()->work_iters;
     uint32_t seq = 0;
+    uint32_t n_act = 0;
     uint32_t prev_act = 0;
     TickType_t last = xTaskGetTickCount();
 
@@ -40,7 +41,7 @@ static void TelemetryTask(void *arg)
 
         /* Gerçek aktivasyon periyodu: planlanan değil, gözlenen (spec §7.1). */
         const uint32_t act = timer_us();
-        if (seq > 0U)
+        if (n_act++ > 0U)
         {
             stats_period_sample(act - prev_act);
         }
@@ -53,30 +54,34 @@ static void TelemetryTask(void *arg)
             stats_work_sample(timer_us() - act);
         }
 
-        TxMsg m;
-        TextBuilder b;
-        msg_begin(&b, &m, MSG_TEL, seq);
-        tb_put_str(&b, "TEL,");
-        tb_put_u32(&b, seq);
-        tb_put_str(&b, ",");
-        tb_put_str(&b, sc->name);
-        tb_put_str(&b, ",");
-        tb_put_u32(&b, (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS));
-        if (!msg_finish(&b))
+        /* S6: aynı aktivasyonda art arda burst kadar mesaj (darbe yükü). */
+        for (uint32_t k = 0; k < sc->burst; k++)
         {
-            g_stats.msg_overflow++;
-            configASSERT(0);
-        }
+            TxMsg m;
+            TextBuilder b;
+            msg_begin(&b, &m, MSG_TEL, seq);
+            tb_put_str(&b, "TEL,");
+            tb_put_u32(&b, seq);
+            tb_put_str(&b, ",");
+            tb_put_str(&b, sc->name);
+            tb_put_str(&b, ",");
+            tb_put_u32(&b, (uint32_t)(xTaskGetTickCount() * portTICK_PERIOD_MS));
+            if (!msg_finish(&b))
+            {
+                g_stats.msg_overflow++;
+                configASSERT(0);
+            }
 
-        if (uart_tx_post(&m))
-        {
-            g_stats.tel_sent++;
+            if (uart_tx_post(&m))
+            {
+                g_stats.tel_sent++;
+            }
+            else
+            {
+                g_stats.tel_tx_drop++;
+            }
+            seq++;
         }
-        else
-        {
-            g_stats.tel_tx_drop++;
-        }
-        seq++;
 
         /* Mutlak periyot tabanı: iş süresi periyodu kaydırmaz (spec §7.1).
            FreeRTOS 10.3.1'de xTaskDelayUntil yok; eşdeğeri vTaskDelayUntil. */

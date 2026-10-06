@@ -1,8 +1,8 @@
 #include "lab.h"
 
-#if APP_LAB_MODE
 #include <string.h>
 
+#include "app_config.h"
 #include "button.h"
 #include "experiment.h"
 #include "msg.h"
@@ -19,7 +19,7 @@
    Linker SRAM2'ye (0x10000000) hiçbir bölüm yerleştirmiyor; başlangıç kodu
    da burayı sıfırlamıyor. Yazılım reset'inde içerik korunur, güç kesilince
    bozulur: magic + checksum ile doğrulanır. */
-#define LAB_MAGIC   0x4C414231U   /* "LAB1" */
+#define LAB_MAGIC   0x4C414232U   /* "LAB2": Hafta 1 ayarı yanlışlıkla okunmasın */
 
 typedef struct {
     uint32_t  magic;
@@ -51,6 +51,8 @@ void lab_load_config(RunConfig *cfg)
     c.name[sizeof c.name - 1] = '\0';
     if (c.target == 0U || c.target > REC_POOL_SIZE) { c.target = TARGET_EVENTS; }
     if (c.gap_max_ms < c.gap_min_ms)              { c.gap_max_ms = c.gap_min_ms; }
+    if (c.variant != 'A' && c.variant != 'B' && c.variant != 'C') { return; }
+    if (c.burst == 0U || c.burst > TX_PENDING_MAX) { c.burst = 1; }
     *cfg = c;
 }
 
@@ -63,23 +65,31 @@ static void store_and_reset(const RunConfig *c)
     NVIC_SystemReset();
 }
 
+static void put_ch(TextBuilder *b, char ch)
+{
+    const char s[2] = { ch, '\0' };
+    tb_put_str(b, s);
+}
+
 /* ---- LAB satırı (UartTxTask üzerinden, UART'ın tek sahibi korunur) ---- */
 
 static void build_lab_msg(TxMsg *m)
 {
     const RunConfig *c = run_config();
     TextBuilder b;
-    msg_begin(&b, m, MSG_TEL, 0);    /* veri mesajı gibi gönderilir, kayıt tutulmaz */
+    msg_begin(&b, m, MSG_INFO, 0);   /* kayıt ve TEL istatistiği tutulmaz */
     tb_put_str(&b, "LAB,");
     tb_put_u32(&b, c->run_id);
     tb_put_str(&b, ",");
     tb_put_str(&b, c->name);
     tb_put_str(&b, ",P");
     tb_put_u32(&b, c->period_ms);
+    tb_put_str(&b, ",V");
+    put_ch(&b, (char)c->variant);
+    tb_put_str(&b, ",B");
+    tb_put_u32(&b, c->burst);
     tb_put_str(&b, ",W");
     tb_put_u32(&b, c->work_us);
-    tb_put_str(&b, ",F");
-    tb_put_u32(&b, c->fix_mask);
     tb_put_str(&b, ",I");
     tb_put_u32(&b, c->inject);
     tb_put_str(&b, ",N");
@@ -106,7 +116,6 @@ static uint32_t parse_u32(const char *s)
 static void parse_run(char *args)
 {
     RunConfig c = *run_config();             /* belirtilmeyen alan eskisi kalır */
-    c.fix_mask = 0;
     c.run_id = 0;
     for (char *tok = strtok(args, " "); tok != NULL; tok = strtok(NULL, " "))
     {
@@ -116,10 +125,11 @@ static void parse_run(char *args)
         const char *k = tok, *v = eq + 1;
         if      (!strcmp(k, "name"))   { strncpy(c.name, v, sizeof c.name - 1);
                                          c.name[sizeof c.name - 1] = '\0'; }
+        else if (!strcmp(k, "var"))    { c.variant    = (uint32_t)v[0]; }
         else if (!strcmp(k, "period")) { c.period_ms  = parse_u32(v); }
+        else if (!strcmp(k, "burst"))  { c.burst      = parse_u32(v); }
         else if (!strcmp(k, "work"))   { c.work_us    = parse_u32(v); }
         else if (!strcmp(k, "target")) { c.target     = parse_u32(v); }
-        else if (!strcmp(k, "fix"))    { c.fix_mask   = parse_u32(v); }
         else if (!strcmp(k, "inject")) { c.inject     = parse_u32(v); }
         else if (!strcmp(k, "gmin"))   { c.gap_min_ms = parse_u32(v); }
         else if (!strcmp(k, "gmax"))   { c.gap_max_ms = parse_u32(v); }
@@ -241,5 +251,3 @@ void lab_create_tasks(void)
     BaseType_t ok = xTaskCreate(InjectTask, "inject", STACK_INJECT, NULL, PRIO_INJECT, NULL);
     configASSERT(ok == pdPASS);
 }
-
-#endif /* APP_LAB_MODE */

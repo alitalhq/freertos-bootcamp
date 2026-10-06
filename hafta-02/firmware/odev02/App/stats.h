@@ -15,10 +15,10 @@ typedef struct {
     volatile uint32_t rec_overflow;   /* kayıt havuzu doldu */
     /* üreticiler */
     volatile uint32_t tel_sent;       /* TelemetryTask: txQ'ya giren TEL */
-    volatile uint32_t tel_tx_drop;    /* TelemetryTask: txQ dolu */
-    volatile uint32_t btn_tx_drop;    /* ButtonTask: txQ dolu */
+    volatile uint32_t tel_tx_drop;    /* TelemetryTask: 16 bekleyen sınırı dolu */
+    volatile uint32_t btn_tx_drop;    /* ButtonTask: 16 bekleyen sınırı dolu */
     volatile uint32_t msg_overflow;   /* üreticiler: 63 baytı aşan metin */
-    volatile uint32_t txq_hwm;        /* üreticiler: txQ en yüksek doluluk */
+    volatile uint32_t txq_hwm;        /* üreticiler: en yüksek toplam bekleyen TX */
     /* UART */
     volatile uint32_t uart_tx_ok;     /* UartTxTask: TC ile biten gönderim */
     volatile uint32_t uart_start_err; /* UartTxTask: HAL_UART_Transmit_IT != HAL_OK */
@@ -27,6 +27,9 @@ typedef struct {
     /* TelemetryTask zamanlaması (yalnızca TelemetryTask yazar) */
     uint32_t period_min_us, period_max_us, period_sum_us, period_n;
     uint32_t work_min_us, work_max_us, work_sum_us, work_n;
+    /* TEL kuyruk beklemesi: kuyruğa giriş -> gönderim başlangıcı (yalnızca UartTxTask) */
+    uint32_t tel_wait_min_us, tel_wait_max_us, tel_wait_n;
+    uint64_t tel_wait_sum_us;
 } Stats;
 
 extern Stats g_stats;
@@ -37,5 +40,8 @@ void stats_update_max(volatile uint32_t *field, uint32_t value);
 /* TelemetryTask: gözlenen aktivasyon periyodu ve kalibre iş süresi (µs). */
 void stats_period_sample(uint32_t us);
 void stats_work_sample(uint32_t us);
+
+/* UartTxTask: bir TEL mesajının kuyrukta beklediği süre (µs). */
+void stats_tel_wait_sample(uint32_t us);
 
 #endif /* STATS_H */

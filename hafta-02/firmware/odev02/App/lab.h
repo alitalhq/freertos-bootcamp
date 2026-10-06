@@ -1,11 +1,11 @@
 #ifndef LAB_H
 #define LAB_H
 
-/* Lab modu (APP_LAB_MODE=1, ADR-004): PC'den UART komutuyla deney seçimi ve
-   otomatik basış üreteci. Resmi derlemede bu dosyanın hiçbir parçası yok.
+/* PC'den UART komutuyla deney seçimi ve otomatik basış üreteci. Hafta 2'de
+   tek derleme kullanılır: sürüm ve senaryo bu komutla seçilir.
 
    PC -> kart komutları (LF ile biten ASCII satırlar):
-     RUN name=S5 period=10 work=5000 target=35 fix=3 inject=1 gmin=500 gmax=1500 seed=7 run=12
+     RUN name=C-S6 var=C period=100 burst=4 work=0 target=35 inject=1 gmin=500 gmax=1500 seed=7 run=12
          Ayarı SRAM2'ye yazar ve kartı yeniden başlatır: her deney temiz
          durumdan (boş kuyruklar, sıfır sayaçlar, yeni kalibrasyon) başlar.
      STOP     Deneyi hedef sayıya ulaşmadan bitirir ve export başlatır.
@@ -14,9 +14,7 @@
 
    Kart -> PC: açılışta ve PING'de 64 baytlık "LAB,..." satırı. */
 
-#include "app_config.h"
-
-#if APP_LAB_MODE
+#include <stdint.h>
 #include "scenario.h"
 
 /* run_config_init içinden: SRAM2'de geçerli ayar varsa cfg'yi ezer. */
@@ -33,6 +31,5 @@ void lab_rx_rearm(void);
 
 /* Export için: otomatik üretilen basış sayısı. */
 uint32_t lab_injected_count(void);
-#endif
 
 #endif /* LAB_H */

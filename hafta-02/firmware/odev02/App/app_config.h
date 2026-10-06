@@ -1,15 +1,24 @@
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
-/* ---- Senaryo seçimi (ADR-003, spec §7) --------------------------------
-   Her senaryo ayrı derlenip yüklenir. 0..5 -> S0..S5 */
+/* ---- Varsayılan deney (Hafta 2) ---------------------------------------
+   Tek derleme: sürüm (A/B/C) ve senaryo (S0..S6) çalışma anında PC'nin
+   gönderdiği RUN komutuyla seçilir (lab.h). Kayıtlı ayar yoksa bunlar
+   kullanılır. SCENARIO: 0..6 -> S0..S6 */
 #ifndef SCENARIO
-#define SCENARIO               1
+#define SCENARIO               5
+#endif
+#ifndef VARIANT
+#define VARIANT                'A'
 #endif
 
-/* ---- Görev öncelikleri (ödev standardı, spec §3.1) -------------------- */
+/* ---- Görev öncelikleri (Ödev 2) ----------------------------------------
+   A: TEL 3 > BTN 2 > TX 1, ortak FIFO
+   B: BTN 4 > TEL 3 > TX 1, ortak FIFO
+   C: B'nin öncelikleri, aktarım sınırında BTN önce */
 #define PRIO_TELEMETRY         3
-#define PRIO_BUTTON            2
+#define PRIO_BUTTON_A          2
+#define PRIO_BUTTON_BC         4
 #define PRIO_UART_TX           1
 
 /* ---- Stack boyutları (word = 4 bayt) ---------------------------------- */
@@ -17,9 +26,13 @@
 #define STACK_BUTTON           256
 #define STACK_UART_TX          256
 
-/* ---- Kuyruklar (ödev standardı, spec §3.3) ---------------------------- */
+/* ---- Kuyruklar ---------------------------------------------------------
+   Her sürümde en fazla TX_PENDING_MAX mesaj gönderilmeyi bekleyebilir.
+   C'de bu sınır iki fiziksel kuyruğun (tx_q + urgent_q) toplamıdır. */
 #define BUTTON_QUEUE_LEN       8
-#define TX_QUEUE_LEN           16
+#define TX_PENDING_MAX         16
+#define TX_QUEUE_LEN           TX_PENDING_MAX
+#define URGENT_QUEUE_LEN       TX_PENDING_MAX
 
 /* ---- Mesaj formatı (ödev standardı, spec §3.4) ------------------------ */
 #define MSG_LEN                64      /* 63 bayt metin + LF */
@@ -41,31 +54,9 @@
    Ölçüm derlemelerinde TANIMLI OLMAMALI. */
 /* #define TEST_AUTO_STOP_MS   10000U */
 
-/* ==== Lab modu (standart dışı, ADR-004) ==================================
-   0: Resmi ödev derlemesi. S0–S5 bu ayarla ölçüldü; aşağıdaki hiçbir çözüm
-      ve UART komut kanalı derlenmez.
-   1: Lab derlemesi. Kart bir kez yüklenir; PC arayüzü UART'tan RUN komutuyla
-      periyot, CPU işi, çözüm maskesi ve basış kaynağını (elle/otomatik) seçer. */
-#ifndef APP_LAB_MODE
-#define APP_LAB_MODE           0
-#endif
-
-#if APP_LAB_MODE
-/* S5'teki birikimli gecikmeye karşı çözüm denemeleri. Her biri kendi
-   #ifdef bloğunda; çalışma anında RunConfig.fix_mask ile seçilir. */
-#define ENABLE_FIX_UART_PRIO          /* F1: UartTxTask önceliği 4 (optimal çözümün yarısı) */
-#define ENABLE_FIX_BTN_PRIO           /* F4: ButtonTask önceliği 4 (optimal çözümün yarısı) */
-#define ENABLE_FIX_TC_CHAIN           /* F8: sonraki gönderim TC kesmesinden (öncelik değişmez) */
-#endif
-
-/* fix_mask bitleri. Arayüzdeki seçenekler: 0 standart, 8 TC zinciri,
-   5 optimal (1|4: UART ve Button önceliği birlikte). */
-#define FIX_UART_PRIO          0x1U
-#define FIX_BTN_PRIO           0x4U
-#define FIX_TC_CHAIN           0x8U
-
-#define PRIO_RAISED            4       /* çözümlerde kullanılan yükseltilmiş öncelik */
-#define PRIO_INJECT            5       /* otomatik basış üreteci (lab), her şeyin üstünde */
+/* ---- Otomatik basış (RUN inject=1) --------------------------------------
+   EXTI13 yazılımla tetiklenir; gerçek basışla aynı ISR ve t0 noktası. */
+#define PRIO_INJECT            5       /* otomatik basış üreteci, her şeyin üstünde */
 #define STACK_INJECT           128
 
 #endif /* APP_CONFIG_H */

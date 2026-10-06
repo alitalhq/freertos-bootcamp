@@ -3,14 +3,15 @@
 
 #include <stdint.h>
 
-/* Çalışan deneyin parametreleri. Resmi derlemede SCENARIO tablosundan,
-   lab modunda (APP_LAB_MODE) PC'nin gönderdiği RUN komutundan gelir. */
+/* Çalışan deneyin parametreleri. Kayıtlı ayar yoksa derleme varsayılanı
+   (SCENARIO, VARIANT), varsa PC'nin gönderdiği RUN komutu (lab.h). */
 typedef struct {
-    char     name[16];      /* "S0".."S5", çözümlüyse "S5-F1" gibi, özel "C.." */
+    char     name[16];      /* "A-S5" gibi; otomatik basışta sonda 'a' */
+    uint32_t variant;       /* 'A', 'B' ya da 'C' */
     uint32_t period_ms;     /* telemetri periyodu, 0 = kapalı */
+    uint32_t burst;         /* periyot başına TEL mesajı (S6: 4) */
     uint32_t work_us;       /* hedef ek CPU işi (kalibre edilir) */
     uint32_t target;        /* bu kadar kabul edilen olaydan sonra export */
-    uint32_t fix_mask;      /* FIX_* bitleri; resmi derlemede her zaman 0 */
     uint32_t inject;        /* 0 = elle basış, 1 = otomatik (EXTI yazılım tetik) */
     uint32_t gap_min_ms;    /* otomatik basışlar arası aralık */
     uint32_t gap_max_ms;
@@ -22,5 +23,11 @@ typedef struct {
 void run_config_init(void);
 
 const RunConfig *run_config(void);
+
+/* C: BTN yanıtı aktarım sınırında öne alınır (uart_tx.c). */
+static inline int variant_btn_first(const RunConfig *c)
+{
+    return c->variant == 'C';
+}
 
 #endif /* SCENARIO_H */

@@ -96,14 +96,6 @@ void button_request_stop_from_isr(void)
     portYIELD_FROM_ISR(wake);
 }
 
-static void post_export_marker(void)
-{
-    TxMsg m = { .type = MSG_CTRL_EXPORT };
-    /* Deney bitti; burada beklemek ölçümü etkilemez. FIFO olduğu için
-       işaret, kuyruktaki tüm mesajlardan sonra işlenir. */
-    xQueueSend(uart_tx_queue(), &m, portMAX_DELAY);
-}
-
 /* t1, yanıt mesajı, t2 ve txQ'ya gönderim. */
 static void reply_to_event(const ButtonEvent *e, const RunConfig *sc)
 {
@@ -153,7 +145,7 @@ static void ButtonTask(void *arg)
 #ifdef TEST_AUTO_STOP_MS
     vTaskDelay(pdMS_TO_TICKS(TEST_AUTO_STOP_MS));
     g_exp_state = EXP_STOPPING;
-    post_export_marker();
+    uart_tx_post_export();
     vTaskSuspend(NULL);
 #endif
 
@@ -166,10 +158,10 @@ static void ButtonTask(void *arg)
         }
 
         /* Son olay işlendi ve kuyrukta bekleyen yoksa export'u başlat.
-           İşaret txQ'nun sonuna girer; FIFO sayesinde son yanıttan sonra işlenir. */
+           İşaret son yanıttan sonra işlenir (bkz. uart_tx_post_export). */
         if (g_exp_state == EXP_STOPPING && uxQueueMessagesWaiting(s_button_q) == 0U)
         {
-            post_export_marker();
+            uart_tx_post_export();
             vTaskSuspend(NULL);
         }
     }
@@ -180,14 +172,8 @@ void button_create(void)
     s_button_q = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(ButtonEvent));
     configASSERT(s_button_q != NULL);
 
-    UBaseType_t prio = PRIO_BUTTON;
-#ifdef ENABLE_FIX_BTN_PRIO
-    if (run_config()->fix_mask & FIX_BTN_PRIO)
-    {
-        /* F4: tek başına naif (t1-t0'ı giderir, birikimi değil); F1 ile optimal. */
-        prio = PRIO_RAISED;
-    }
-#endif
+    /* A -> B: yalnızca ButtonTask önceliği değişir (2 -> 4). */
+    const UBaseType_t prio = (run_config()->variant == 'A') ? PRIO_BUTTON_A : PRIO_BUTTON_BC;
     BaseType_t ok = xTaskCreate(ButtonTask, "button", STACK_BUTTON, NULL,
                                 prio, NULL);
     configASSERT(ok == pdPASS);

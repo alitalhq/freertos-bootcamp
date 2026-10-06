@@ -5,6 +5,7 @@
 Stats g_stats = {
     .period_min_us = UINT32_MAX,
     .work_min_us = UINT32_MAX,
+    .tel_wait_min_us = UINT32_MAX,
 };
 
 void stats_update_max(volatile uint32_t *field, uint32_t value)
@@ -36,4 +37,12 @@ void stats_work_sample(uint32_t us)
 {
     sample(&g_stats.work_min_us, &g_stats.work_max_us,
            &g_stats.work_sum_us, &g_stats.work_n, us);
+}
+
+void stats_tel_wait_sample(uint32_t us)
+{
+    if (us < g_stats.tel_wait_min_us) { g_stats.tel_wait_min_us = us; }
+    if (us > g_stats.tel_wait_max_us) { g_stats.tel_wait_max_us = us; }
+    g_stats.tel_wait_sum_us += us;   /* uzun deneylerde 32 bit taşabilir */
+    g_stats.tel_wait_n++;
 }
