@@ -13,6 +13,7 @@ FreeRTOS Bootcamp (Erhan Konak, 20 Eylül – 22 Kasım 2026) haftalık ödevler
 | Hafta | Konu | Klasör |
 |---|---|---|
 | 01 | Yük altında buton yanıtı: zamanlama ve gecikme analizi | [hafta-01](hafta-01/) · [rapor](hafta-01/analysis/report.md) |
+| 02 | Tasarım kararını savun: görev önceliği ve mesaj sırası (A/B/C) | [hafta-02](hafta-02/) · [rapor](hafta-02/analysis/report.md) |
 
 ## Hazırlık bilgileri
 
