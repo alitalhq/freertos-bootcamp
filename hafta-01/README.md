@@ -118,20 +118,17 @@ pip install -r requirements.txt
 python lab_app.py
 ```
 
-Türkçe arayüz, koyu tema (sol üstten açık temaya geçilebilir). Solda deneme listesi, sağda seçili denemenin başlığı ve tek işli sekmeler:
+Türkçe arayüz, koyu tema. Solda deneme listesi, sağda seçili denemenin başlığı ve üç sekme:
 
 | Sekme | Ne gösterir |
 |---|---|
-| **Özet** | Bir cümlelik sonuç, olay başına R grafiği, zamanın aşamalara dağılımı ve teşhis |
-| **Neden geç kaldı?** | Olay listesi (geç ve kayıp olanlar üstte). Seçilen olayın aşama dökümü, 20 ms payı ve ölçümden çıkarılan neden |
+| **Sonuç** | Bir cümlelik sonuç, olay başına R grafiği, zamanın aşamalara dağılımı ve teşhis. Grafikte bir noktaya tıklayınca o olayın aşama dökümü, 20 ms payı ve ölçümden çıkarılan nedeni açılır. En altta bütün kayıtların tablosu |
 | **Karşılaştır** | İşaretlenen denemelerin aşama ortalamaları yan yana, özet tablo |
-| **Kayıtlar** | Olay bazında tablo, kartın gönderdiği CFG/CNT/TSK değerleri |
-| **Yeni deney** | 1 · Kart, 2 · Yük (senaryo ya da özel periyot + CPU işi), 3 · Çözüm (standart / TC zinciri / optimal), 4 · Basışlar (otomatik ya da elle, olay sayısı). **Deneyi başlat** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir. Sonuç Özet sekmesinde açılır |
-| **Rehber** | Ölçüm, S5'in neden başarısız olduğu ve çözümler |
+| **Yeni deney** | 1 · Kart, 2 · Yük (senaryo ya da özel periyot + CPU işi), 3 · Çözüm (standart / TC zinciri / optimal), 4 · Basışlar (otomatik ya da elle, olay sayısı). **Deneyi başlat** dediğinde kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir. Sonuç, Sonuç sekmesinde açılır |
 
 - **Açılışta** resmi S0–S5 ölçümleri ve S5 çözüm denemeleri yüklü gelir. Kart bağlı olmasa da incelenebilir.
 - **Kendi deneyin için** karta bir kez lab derlemesini yükle: `App/app_config.h` → `#define APP_LAB_MODE 1`, derle, yükle.
-- **Kayıt:** Sol alttaki **CSV kaydet** (ödev formatı + meta), **Ham kaydet** (ham UART baytları), **Aç…** (ikisini de açar).
+- **Kayıt:** Sol alttaki **Kaydet…** CSV (ödev formatı) ve `_meta.txt` yazar; deneme bu oturumda alındıysa ham UART baytlarını da `_raw.bin` olarak kaydeder. **Aç…** CSV ya da ham oturum dosyasını açar.
 
 Komut satırından aynı deneyler: `python labctl.py run --preset S5 --fix optimal --inject auto`.
 
