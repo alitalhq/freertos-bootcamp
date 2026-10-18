@@ -8,12 +8,16 @@ Tüm çıktılar yalnızca ham CSV + meta dosyalarından üretilir (elle düzelt
   analysis/plots/drops_s5.png           S5: kaybolan mesajın türü (BTN mi TEL mi?)
   analysis/plots/tel_wait.png           koşu -> TEL kuyruk beklemesi (ort / maks)
 
-Kullanım: python analysis/analyze.py
+Kullanım: python analysis/analyze.py [ölçüm klasörü]
+  Klasör verilmezse resmî ölçümler (measurements/) işlenir. Başka bir klasör
+  (ör. measurements/tekrar) verilirse grafikler analysis/plots/<klasör adı>/
+  altına, özet o klasörün summary.csv dosyasına yazılır.
 """
 from __future__ import annotations
 
 import csv
 import statistics
+import sys
 from pathlib import Path
 
 import matplotlib
@@ -284,14 +288,19 @@ def plot_tel_wait(data: dict) -> Path:
 
 
 def main() -> None:
+    global PLOTS
+    meas = MEAS
+    if len(sys.argv) > 1:
+        meas = Path(sys.argv[1]).resolve()
+        PLOTS = PLOTS / meas.name
     PLOTS.mkdir(parents=True, exist_ok=True)
-    data = {n: load(MEAS, n) for n in RUNS}
-    print(f"wrote {write_summary(MEAS, data)}")
+    data = {n: load(meas, n) for n in RUNS}
+    print(f"wrote {write_summary(meas, data)}")
     for p in (plot_response_per_event(data), plot_stage_breakdown(data), plot_drops_s5(data),
               plot_tel_wait(data)):
         print(f"wrote {p}")
 
-    auto = MEAS / "auto"
+    auto = meas / "auto"
     if auto.is_dir():
         adata = {n: load(auto, n + "a") for n in RUNS if (auto / f"{n}a.csv").exists()}
         if adata:

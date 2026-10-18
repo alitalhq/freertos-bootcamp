@@ -64,10 +64,25 @@ Her koşu için üç dosya yazılır:
 
 ```sh
 pip install matplotlib numpy
-python hafta-02/analysis/analyze.py
+python hafta-02/analysis/analyze.py                            # resmî ölçümler
+python hafta-02/analysis/analyze.py hafta-02/measurements/tekrar   # tekrar ölçümü
 ```
 
 Özet tabloyu ve `analysis/plots/` altındaki grafikleri yalnızca ham dosyalardan yeniden üretir.
+
+### Tekrar ölçümü
+
+18 Ekim 2026'da aynı firmware ile beş koşu fiziksel basışla yeniden alındı: [`measurements/tekrar/`](measurements/tekrar/), grafikler [`analysis/plots/tekrar/`](analysis/plots/tekrar/). Sonuçlar ilk ölçümle aynı yönde:
+
+| Koşu | Yanıt | > 20 ms | R maks (ms) | Kayıp BTN / TEL |
+|---|---|---|---|---|
+| A-S5 | 22/35 | 22 | 165,3 | 13 / 7 |
+| B-S5 | 35/35 | 35 | 165,2 | 0 / 20 |
+| C-S5 | 35/35 | 0 | 15,4 | 0 / 21 |
+| B-S6 | 35/35 | 2 | 23,5 | 0 / 0 |
+| C-S6 | 35/35 | 0 | 10,1 | 0 / 0 |
+
+`tekrar/A-S5_raw.txt` içinde `TEL,0` yok: kart RUN geldiğinde varsayılan ayarla (adı yine A-S5) çalışıyordu ve bu satır reset baytıyla birleşip bozuldu; araç bozuk satırı attı. Ham TEL sayısı bu yüzden `tel_sent` değerinden 1 eksik (4658 / 4659); diğer dört koşuda eşit.
 
 ### Ölçüm notları
 
