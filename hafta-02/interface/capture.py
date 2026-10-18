@@ -248,6 +248,7 @@ def main() -> int:
         p.add_argument("--timeout", type=float, default=900)
         p.add_argument("--overwrite", action="store_true")
         p.add_argument("--trace", action="store_true", help="record a SystemView trace (.SVDat)")
+        p.add_argument("--suffix", default="", help="extra run name suffix for repeat runs (e.g. 2)")
         p.add_argument("--tx-prio", type=int, default=0,
                        help="UartTxTask priority for the improvement experiment (0 = default 1)")
         if p.prog.endswith("run"):
@@ -262,9 +263,10 @@ def main() -> int:
     inject = a.inject == "auto"
     runs = [(a.variant, a.scenario)] if a.cmd == "run" else MATRIX
     for i, (variant, scenario) in enumerate(runs):
-        name = run_name(variant, scenario, inject, a.trace, a.tx_prio)
+        name = run_name(variant, scenario, inject, a.trace, a.tx_prio) + a.suffix
         cmd = run_command(variant, scenario, inject, a.target, a.seed + i,
                           int(time.time()) % 100000, a.gap_min, a.gap_max, a.trace, a.tx_prio)
+        cmd = cmd.replace(f"name={name[:len(name) - len(a.suffix)]} ", f"name={name} ", 1)
         rc = capture(port, cmd, name, a.out, a.target, a.timeout, a.overwrite, a.trace)
         if rc != 0:
             return rc
