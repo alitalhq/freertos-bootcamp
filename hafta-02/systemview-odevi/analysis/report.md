@@ -1,6 +1,10 @@
 # SystemView Ödevi: A/B/C'yi iz üzerinden açıklamak
 
-Ham veri: [`../measurements/`](../measurements/), izler: [`../traces/`](../traces/), eşleşme: [`../experiment.csv`](../experiment.csv). Görseller [`sv_figures.py`](sv_figures.py) ile `.SVDat` dosyalarından üretildi.
+Ham veri: [`../measurements/`](../measurements/), izler: [`../traces/`](../traces/), eşleşme: [`../experiment.csv`](../experiment.csv).
+
+Görseller iki türlü:
+- **SystemView ekran görüntüleri** (`screenshots/*_isaretli.png`): SystemView V4.10b'de açılan kısa pencere dosyalarından ([`../traces/ekran/`](../traces/ekran/), [`sv_window.py`](sv_window.py)) alındı, işaretler [`annotate.py`](annotate.py) ile eklendi.
+- **İzden çizilen zaman çizelgeleri** (`figures/*.png`): aynı `.SVDat` dosyalarından [`sv_figures.py`](sv_figures.py) ile; olay adları ve Ready aralıkları burada görünür.
 
 ## 1. Kayıt yöntemi
 
@@ -29,7 +33,9 @@ Bütün koşular fiziksel B1 basışlarıyla, aynı firmware (`odev02`) ve tek b
 
 ## 3. A/S5: CPU nerede bekliyor?
 
-![CPU beklemesi](figures/1_cpu_bekleme.png)
+![CPU beklemesi, SystemView](screenshots/1_cpu_bekleme_isaretli.png)
+
+![CPU beklemesi, izden çizim](figures/1_cpu_bekleme.png)
 
 Basış telemetry'nin 5 ms'lik işinin içine düştü. button **Ready** ama önceliği (2) telemetry'den (3) düşük: **5,22 ms CPU bekledi**. Aynı anda uart_tx de TC'den beri Ready; hat ~4,5 ms boş kaldı. telemetry işini bitirip TEL'i koydu ve son boş yeri aldı, yanıt `BTN_DROP` ile düştü.
 
@@ -37,7 +43,9 @@ Basış telemetry'nin 5 ms'lik işinin içine düştü. button **Ready** ama ön
 
 ## 4. B/S5: yalnız görev önceliği neyi değiştirdi?
 
-![Kuyruk beklemesi](figures/2_kuyruk_bekleme.png)
+![CPU beklemesi yok, SystemView](screenshots/2_kuyruk_bekleme_isaretli.png)
+
+![Kuyruk beklemesi, izden çizim](figures/2_kuyruk_bekleme.png)
 
 button artık telemetry'yi kesiyor: t₁−t₀ ≈ 0,1 ms. Ama yanıt kuyrukta **154 ms** bekliyor:
 - uart_tx (öncelik 1) her 10 ms'de yalnızca bir kez, telemetry işi bitince çalışıyor.
@@ -50,7 +58,9 @@ S6'da 4 TEL'lik darbe var. B'de yanıt darbenin arkasına düşerse 4 mesaj bekl
 
 ## 6. İyileştirme: UART görev önceliği 1 → 4 (tek değişken)
 
-![Önce ve sonra](figures/3_once_sonra_uart_onceligi.png)
+![Sonra: UART önceliği 4, SystemView](screenshots/3_iyilestirme_uart_onceligi_isaretli.png)
+
+![Önce ve sonra, izden çizim](figures/3_once_sonra_uart_onceligi.png)
 
 | B/S5 | Önce (öncelik 1) | Sonra (öncelik 4) |
 |---|---|---|

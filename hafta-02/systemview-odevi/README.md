@@ -5,10 +5,11 @@ Hafta 2'nin A/B/C deneyini SEGGER SystemView iziyle açıklıyoruz. Rapor: [anal
 | Klasör / dosya | İçerik |
 |---|---|
 | `traces/` | Orijinal SystemView kayıtları (`.SVDat`) |
-| `traces/windows/` | Görseller için kesilmiş kısa parçalar (senkron noktalarından) |
+| `traces/windows/` | Kesilmiş kısa parçalar (senkron noktalarından) |
+| `traces/ekran/` | SystemView ekran görüntüleri için birkaç ms'lik pencereler (`analysis/sv_window.py`) |
 | `measurements/` | Her koşunun ham UART oturumu, CSV ve meta dosyası |
 | `experiment.csv` | Koşu → koşul, rol, iz dosyası ve izdeki olay kimlikleri |
-| `analysis/` | Rapor, görseller, `.SVDat` çözücüsü (`svdat.py`) ve çizim betiği (`sv_figures.py`) |
+| `analysis/` | Rapor, işaretli SystemView ekran görüntüleri (`screenshots/`), izden çizimler (`figures/`), `.SVDat` çözücüsü ve betikler |
 | `SYSVIEW_Odev2_BTN.txt` | Uygulama olaylarının adları (SystemView'de elle yüklenir) |
 | `ai-usage.md` | Yapay zekâ kullanımı ve doğrulama |
 
