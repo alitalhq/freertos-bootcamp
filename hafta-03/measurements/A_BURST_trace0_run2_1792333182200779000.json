@@ -1,0 +1,37 @@
+{
+  "source": "hardware_serial",
+  "port": "/dev/cu.usbmodem103",
+  "variant": "A",
+  "load": "BURST",
+  "run_id": 2,
+  "trace_enabled": false,
+  "attempted": 44,
+  "accepted": 24,
+  "failed": 20,
+  "consumed": 24,
+  "result": [
+    "#RESULT",
+    "2",
+    "A",
+    "BURST",
+    "44",
+    "24",
+    "20",
+    "24",
+    "0",
+    "0",
+    "0"
+  ],
+  "trace": null,
+  "max_latency_us": 59936,
+  "max_send_us": 30,
+  "stack_words": [
+    "704",
+    "718",
+    "772"
+  ],
+  "rx_errors_drops": [
+    "0",
+    "0"
+  ]
+}

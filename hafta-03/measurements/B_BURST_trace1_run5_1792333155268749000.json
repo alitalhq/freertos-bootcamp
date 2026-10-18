@@ -1,0 +1,43 @@
+{
+  "source": "hardware_serial",
+  "port": "/dev/cu.usbmodem103",
+  "variant": "B",
+  "load": "BURST",
+  "run_id": 5,
+  "trace_enabled": true,
+  "attempted": 44,
+  "accepted": 36,
+  "failed": 8,
+  "consumed": 36,
+  "result": [
+    "#RESULT",
+    "5",
+    "B",
+    "BURST",
+    "44",
+    "36",
+    "8",
+    "36",
+    "1",
+    "12544",
+    "0"
+  ],
+  "trace": {
+    "bytes": 12544,
+    "fnv1a": "3B70B4A5",
+    "drops": 0,
+    "stop_reason": 1,
+    "sha256": "8de6f86ba274c6a2c268b825bc9bc5030f378fb641bb4888707f8bb22a51688d"
+  },
+  "max_latency_us": 300431,
+  "max_send_us": 58,
+  "stack_words": [
+    "708",
+    "710",
+    "772"
+  ],
+  "rx_errors_drops": [
+    "0",
+    "0"
+  ]
+}

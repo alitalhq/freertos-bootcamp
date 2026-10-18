@@ -1,0 +1,43 @@
+{
+  "source": "hardware_serial",
+  "port": "/dev/cu.usbmodem103",
+  "variant": "C",
+  "load": "NORMAL",
+  "run_id": 3,
+  "trace_enabled": true,
+  "attempted": 44,
+  "accepted": 44,
+  "failed": 0,
+  "consumed": 44,
+  "result": [
+    "#RESULT",
+    "3",
+    "C",
+    "NORMAL",
+    "44",
+    "44",
+    "0",
+    "44",
+    "1",
+    "12071",
+    "0"
+  ],
+  "trace": {
+    "bytes": 12071,
+    "fnv1a": "CC668A85",
+    "drops": 0,
+    "stop_reason": 1,
+    "sha256": "6990ed0075330e090038690ff33e660aa6e51a0fabf700f08f53138e34198390"
+  },
+  "max_latency_us": 136,
+  "max_send_us": 47,
+  "stack_words": [
+    "708",
+    "710",
+    "772"
+  ],
+  "rx_errors_drops": [
+    "0",
+    "0"
+  ]
+}
