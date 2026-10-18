@@ -1,0 +1,30 @@
+[
+  {
+    "name": "cmsis",
+    "repository": "ARM-software/CMSIS_5",
+    "tag": "5.9.0",
+    "url": "https://codeload.github.com/ARM-software/CMSIS_5/zip/refs/tags/5.9.0",
+    "sha256": "3d4bfaf8783c633149510d098630a9d2f273dc090ea5e807103cc9b7acbb6708"
+  },
+  {
+    "name": "device",
+    "repository": "STMicroelectronics/cmsis-device-l4",
+    "tag": "v1.7.4",
+    "url": "https://codeload.github.com/STMicroelectronics/cmsis-device-l4/zip/refs/tags/v1.7.4",
+    "sha256": "714f47900ccbbba1efeb27be3a868cf5ffc71636d9416f33dc815adb5066cec5"
+  },
+  {
+    "name": "hal",
+    "repository": "STMicroelectronics/stm32l4xx-hal-driver",
+    "tag": "v1.13.5",
+    "url": "https://codeload.github.com/STMicroelectronics/stm32l4xx-hal-driver/zip/refs/tags/v1.13.5",
+    "sha256": "57482a557cc505ed6d85caee86e6fd619153ac02b8466bd470fe9920d2dcaeea"
+  },
+  {
+    "name": "freertos",
+    "repository": "FreeRTOS/FreeRTOS-Kernel",
+    "tag": "V11.1.0",
+    "url": "https://codeload.github.com/FreeRTOS/FreeRTOS-Kernel/zip/refs/tags/V11.1.0",
+    "sha256": "d5875acad2479817b35b2031dc1c7c22d100f45c7f3c9f6039cb217437a298a2"
+  }
+]
