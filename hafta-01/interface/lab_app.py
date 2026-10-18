@@ -1,8 +1,9 @@
 """RTOS Lab: yük altında buton yanıtı deney ve analiz arayüzü (PySide6).
 
-Düzen: solda sabit kontrol çubuğu (bağlantı, deney ayarları, canlı durum,
-deneme listesi), sağda kaydırılan tek bir rapor sayfası (bulgu cümlesi,
-olay başına R, aşamalar, geç kalan olayın dökümü, karşılaştırma, kayıtlar).
+Düzen: solda deneme listesi, sağda seçili denemenin başlığı ve üç sekme:
+  Sonuç       bulgu cümlesi, olay başına R, aşamalar, tek olayın dökümü, kayıtlar
+  Karşılaştır işaretlenen denemelerin aşama ortalamaları
+  Yeni deney  karta bağlan, ayarları seç, deneyi başlat
 Arayüz metinleri Türkçe; teknik terimler (UART, TC, txQ, ButtonTask…) aynen.
 
 - Açılışta resmi S0–S5 ölçümleri ve S5 çözüm denemeleri gösterilir.
@@ -28,7 +29,7 @@ from PySide6.QtGui import QColor, QFont  # noqa: E402
 from PySide6.QtWidgets import (  # noqa: E402
     QAbstractItemView, QApplication, QButtonGroup, QComboBox, QFileDialog, QFrame, QGridLayout,
     QHBoxLayout, QHeaderView, QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-    QGroupBox, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QSplitter,
+    QGroupBox, QProgressBar, QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox,
     QTabWidget, QTableWidget,
     QTableWidgetItem, QTextBrowser, QVBoxLayout, QWidget,
 )
@@ -61,8 +62,7 @@ def num(v: float | None, d: int = 2) -> str:
 
 
 # ---- Tema ---------------------------------------------------------------------
-# Veri renkleri dataviz referans paletinden (her iki modda doğrulayıcıdan geçti).
-# Açık modda aqua/sarı 3:1'in altında: rahatlatma = değer etiketleri + kayıt tablosu.
+# Yalnızca koyu tema. Veri renkleri dataviz referans paletinden (doğrulayıcıdan geçti).
 
 @dataclass(frozen=True)
 class Theme:
@@ -81,13 +81,10 @@ class Theme:
     stages: tuple
 
 
-LIGHT = Theme("light", page="#f3f2ef", surface="#fcfcfb", raised="#ffffff", ink="#0b0b0b", ink2="#52514e",
-              muted="#8a897f", grid="#e4e3df", accent="#4a3aa7", accent_ink="#ffffff", ok="#2a78d6",
-              critical="#d03b3b", stages=("#2a78d6", "#eb6834", "#1baf7a", "#eda100"))
 DARK = Theme("dark", page="#121211", surface="#1a1a19", raised="#232321", ink="#ffffff", ink2="#c3c2b7",
              muted="#8a897f", grid="#383835", accent="#9085e9", accent_ink="#121211", ok="#3987e5",
              critical="#d03b3b", stages=("#3987e5", "#d95926", "#199e70", "#c98500"))
-T = DARK   # varsayılan: koyu tema
+T = DARK
 
 
 def stage_color(key: str) -> str:
@@ -178,7 +175,9 @@ class Chart(FigureCanvasQTAgg):
         self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)   # genişlik alana uyar
         self._hover_pts: list[tuple[float, float, str]] = []
         self._tip = None
+        self.on_pick = None                # tıklanan noktanın sırası ile çağrılır
         self.mpl_connect("motion_notify_event", self._on_move)
+        self.mpl_connect("button_press_event", self._on_click)
 
     def begin(self):
         self.fig.clear()
@@ -205,6 +204,24 @@ class Chart(FigureCanvasQTAgg):
                                 color=T.ink, bbox=dict(boxstyle="round,pad=0.45", fc=T.raised, ec=T.muted, lw=0.8))
         self._tip.set_visible(False)
 
+    def _nearest(self, ev) -> int | None:
+        """İmlece 12 px'ten yakın noktanın sırası."""
+        if not self._hover_pts or ev.inaxes is not self._hover_ax:
+            return None
+        tr = self._hover_ax.transData
+        best, bd = None, 12.0 ** 2
+        for i, (x, y, _) in enumerate(self._hover_pts):
+            px, py = tr.transform((x, y))
+            d = (px - ev.x) ** 2 + (py - ev.y) ** 2
+            if d < bd:
+                best, bd = i, d
+        return best
+
+    def _on_click(self, ev):
+        i = self._nearest(ev)
+        if i is not None and self.on_pick:
+            self.on_pick(i)
+
     def _on_move(self, ev):
         if not self._hover_pts or self._tip is None:
             return
@@ -213,13 +230,8 @@ class Chart(FigureCanvasQTAgg):
                 self._tip.set_visible(False)
                 self.draw_idle()
             return
-        tr = self._hover_ax.transData
-        best, bd = None, 12.0 ** 2
-        for x, y, text in self._hover_pts:
-            px, py = tr.transform((x, y))
-            d = (px - ev.x) ** 2 + (py - ev.y) ** 2
-            if d < bd:
-                best, bd = (x, y, text), d
+        i = self._nearest(ev)
+        best = self._hover_pts[i] if i is not None else None
         if best:
             right = ev.x > self.width() * 0.6
             self._tip.xy = best[:2]
@@ -270,8 +282,8 @@ class ResponseChart(Chart):
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         ax.yaxis.set_major_formatter(TR_TICKS)
         ax.legend(loc="upper left", fontsize=8, frameon=False, labelcolor=T.ink2, ncols=3)
-        self.set_hover(ax, [(e.rec.event_id, e.r_ms if e.ok else top * 0.035, event_tip(e)) for e in run.events
-                            if e.ok or e.rec.status != "ok"])
+        self.picked = [e for e in run.events if e.ok or e.rec.status != "ok"]
+        self.set_hover(ax, [(e.rec.event_id, e.r_ms if e.ok else top * 0.035, event_tip(e)) for e in self.picked])
         self.fig.tight_layout()
         self.draw_idle()
 
@@ -426,29 +438,6 @@ def headline(run: Run) -> str:
     return s
 
 
-GUIDE = """
-<p><b>R = t4 − t0</b>: buton ISR'ından (t0) yanıtın UART gönderim-tamamlandı (TC) kesmesine (t4) kadar geçen
-süre; kartın 1 µs'lik sayacıyla ölçülür, PC saati hiç kullanılmaz. Kaybolan bir yanıt hiçbir zaman
-"tutuldu" sayılmaz.</p>
-<p><b>Aşamalar:</b> görev bekleme (ISR → ButtonTask olayı alır; öncelik 3'teki iş çalışırken büyür) ·
-yanıt hazırlama (~25 µs) · TX öncesi bekleme (txQ + hattın dolu olması + UART görevinin CPU alması) ·
-UART + TC (hatta 5,56 ms).</p>
-<p><b>S5 neden başarısız:</b> her 10 ms'lik periyot ~5 ms'lik öncelik 3 işiyle başlıyor. Öncelik 1'deki UART
-görevi yalnızca kalan ~4,95 ms'de mesaj başlatabiliyor; mesaj ise 5,56 ms sürüyor. Hat periyot başına en fazla
-bir mesaj taşıyor, bu da telemetri hızına eşit. Her yanıt hiç erimeyen bir mesaj ekliyor.</p>
-<p><b>Çözümler</b> (lab firmware'i, <code>#ifdef</code> bloklarında): <b>öncelik değiştirmeden: TC zinciri</b>
-(sıradaki mesajı TC kesmesi başlatır; öncelikler 3 &gt; 2 &gt; 1 kalır) · <b>optimal: UART ve Button görevleri
-CPU işinin üstünde</b> (görev beklemesini de kaldırır).</p>
-<p><b>CPU işini kesmek hata mı?</b> Öncelik "ne kadar önemli"ye değil "ne kadar acil ve kısa"ya göre verilir.
-Üste alınan görevler mesaj/basış başına yalnızca onlarca µs sürer ve sınırlıdır (basış en fazla ~33/s, mesaj
-~180/s); CPU işi periyotta ~36 µs uzar ve yine 10 ms'ye rahat sığar. Üstelik UART artık aç kalmadığı için
-telemetri kaybı 9'dan 0'a iner.</p>
-<p><b>Kendi deneyin:</b> karta bir kez lab derlemesini yükle (<code>APP_LAB_MODE 1</code>), bağlan, ayarları seç ve
-Deneyi başlat'a bas. Kart bu ayarlarla yeniden başlar, 5 s ısınır, basışları toplar ve kayıtları gönderir.
-Otomatik basış EXTI13'ü yazılımla tetikler (aynı ISR ve t0 yolu); elle basışta LD2 yanınca B1'e sen basarsın.</p>
-"""
-
-
 # ---- Pencere ----------------------------------------------------------------------
 
 def scroll_page(inner: QWidget) -> QScrollArea:
@@ -462,9 +451,9 @@ def scroll_page(inner: QWidget) -> QScrollArea:
 
 
 class LabWindow(QMainWindow):
-    """Solda deneme listesi; sağda seçili denemenin başlığı ve tek işli sekmeler."""
+    """Solda deneme listesi; sağda seçili denemenin başlığı ve üç sekme."""
 
-    TAB_SUMMARY, TAB_WHY, TAB_COMPARE, TAB_RECORDS, TAB_RUN, TAB_GUIDE = range(6)
+    TAB_RESULT, TAB_COMPARE, TAB_RUN = range(3)
 
     def __init__(self):
         super().__init__()
@@ -507,14 +496,7 @@ class LabWindow(QMainWindow):
         v = QVBoxLayout(side)
         v.setContentsMargins(16, 18, 16, 14)
         v.setSpacing(6)
-        top = QHBoxLayout()
-        top.addWidget(label("RTOS Lab", "brand"))
-        top.addStretch(1)
-        self.theme_btn = QPushButton("Açık tema")
-        self.theme_btn.setObjectName("link")
-        self.theme_btn.clicked.connect(self._toggle_theme)
-        top.addWidget(self.theme_btn)
-        v.addLayout(top)
+        v.addWidget(label("RTOS Lab", "brand"))
         v.addWidget(label("yük altında buton yanıtı · NUCLEO-L476RG", "small"))
         v.addWidget(label("DENEMELER", "section"))
         v.addWidget(label("İncelemek için bir denemeye tıkla. Mavi nokta: tüm deadline'lar tutuldu, "
@@ -525,7 +507,7 @@ class LabWindow(QMainWindow):
         self.run_list.itemClicked.connect(self._run_clicked)
         v.addWidget(self.run_list, 1)
         row = QHBoxLayout()
-        for text, fn in (("Aç…", self._open_file), ("CSV kaydet", self._save_csv), ("Ham kaydet", self._save_raw)):
+        for text, fn in (("Aç…", self._open_file), ("Kaydet…", self._save)):
             b = QPushButton(text)
             b.clicked.connect(fn)
             row.addWidget(b)
@@ -540,12 +522,6 @@ class LabWindow(QMainWindow):
         v = QVBoxLayout(w)
         v.setContentsMargins(28, 18, 28, 10)
         v.setSpacing(6)
-        chips = QHBoxLayout()
-        self.chip_group, self.chip_press, self.chip_fix = label("", "chip"), label("", "chip"), label("", "chip")
-        for c in (self.chip_group, self.chip_press, self.chip_fix):
-            chips.addWidget(c)
-        chips.addStretch(1)
-        v.addLayout(chips)
         self.title = label("", "title")
         self.conditions = label("", "muted")
         self.metrics = label("", "metrics")
@@ -556,29 +532,27 @@ class LabWindow(QMainWindow):
         v.addSpacing(6)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._tab_summary(), "Özet")
-        self.tabs.addTab(self._tab_why(), "Neden geç kaldı?")
+        self.tabs.addTab(self._tab_result(), "Sonuç")
         self.tabs.addTab(self._tab_compare(), "Karşılaştır")
-        self.tabs.addTab(self._tab_records(), "Kayıtlar")
         self.tabs.addTab(self._tab_run(), "Yeni deney")
-        guide = QTextBrowser()
-        guide.setHtml(GUIDE)
-        self.tabs.addTab(guide, "Rehber")
         v.addWidget(self.tabs, 1)
         return w
 
-    def _tab_summary(self) -> QWidget:
+    def _tab_result(self) -> QWidget:
         page = QWidget()
         v = QVBoxLayout(page)
         v.setContentsMargins(0, 14, 8, 8)
         v.setSpacing(10)
         self.headline = label("", "headline", wrap=True)
         v.addWidget(self.headline)
+
         v.addWidget(label("Olay başına yanıt süresi", "h2"))
         v.addWidget(label("Her nokta bir buton basışı. Kareler deadline'ı aştı, ✕ hiç yanıt almadı. "
-                          "Bir noktanın üzerine gelince aşamaları görünür.", "muted", wrap=True))
+                          "Bir noktaya tıklayınca aşağıda o olayın dökümü açılır.", "muted", wrap=True))
         self.resp_chart = ResponseChart(9, 3.2)
+        self.resp_chart.on_pick = self._pick_event
         v.addWidget(self.resp_chart)
+
         v.addWidget(label("Zaman nereye gidiyor?", "h2"))
         row = QHBoxLayout()
         self.stage_chart = StageChart(5.2, 2.5)
@@ -587,35 +561,28 @@ class LabWindow(QMainWindow):
         row.addWidget(self.stage_chart, 5)
         row.addWidget(self.diag, 4)
         v.addLayout(row)
-        v.addStretch(1)
-        return scroll_page(page)
 
-    def _tab_why(self) -> QWidget:
-        page = QWidget()
-        h = QHBoxLayout(page)
-        h.setContentsMargins(0, 14, 8, 8)
-        left = QVBoxLayout()
-        left.addWidget(label("Olaylar", "h2"))
-        left.addWidget(label("Aşan ve kaybolanlar üstte", "small"))
-        self.event_list = QListWidget()
-        self.event_list.setFixedWidth(260)
-        self.event_list.currentRowChanged.connect(self._show_event)
-        left.addWidget(self.event_list, 1)
-        h.addLayout(left)
-        right = QVBoxLayout()
-        right.setSpacing(10)
-        right.addWidget(label("Seçili olayın süresi aşamalara bölünmüş hali", "h2"))
-        right.addWidget(label("R = görev bekleme + yanıt hazırlama + TX öncesi bekleme + UART. Kırmızı kesik çizgi "
-                              "20 ms deadline; ok ise kalan pay.", "muted", wrap=True))
+        head = QHBoxLayout()
+        head.addWidget(label("Tek bir olay", "h2"))
+        head.addStretch(1)
+        self.event_box = QComboBox()
+        self.event_box.setMinimumWidth(260)
+        self.event_box.currentIndexChanged.connect(self._show_event)
+        head.addWidget(self.event_box)
+        v.addLayout(head)
+        v.addWidget(label("R = görev bekleme + yanıt hazırlama + TX öncesi bekleme + UART. Kırmızı kesik çizgi "
+                          "20 ms deadline; ok ise kalan pay. Listede aşan ve kaybolanlar üstte.", "muted", wrap=True))
         self.budget_chart = BudgetChart(9, 2.0)
-        right.addWidget(self.budget_chart)
-        right.addWidget(label("Neden?", "h2"))
+        v.addWidget(self.budget_chart)
         self.cause = label("", "", wrap=True)
         self.cause.setTextFormat(Qt.RichText)
-        right.addWidget(self.cause)
-        right.addStretch(1)
-        h.addSpacing(16)
-        h.addLayout(right, 1)
+        v.addWidget(self.cause)
+
+        v.addWidget(label("Bütün kayıtlar", "h2"))
+        self.rec_table = QTableWidget()
+        self.rec_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.rec_table.setMinimumHeight(320)
+        v.addWidget(self.rec_table)
         return scroll_page(page)
 
     def _tab_compare(self) -> QWidget:
@@ -644,31 +611,6 @@ class LabWindow(QMainWindow):
         h.addSpacing(16)
         h.addLayout(right, 1)
         return scroll_page(page)
-
-    def _tab_records(self) -> QWidget:
-        page = QWidget()
-        v = QVBoxLayout(page)
-        v.setContentsMargins(0, 14, 8, 8)
-        split = QSplitter(Qt.Vertical)
-        top = QWidget()
-        tv = QVBoxLayout(top)
-        tv.setContentsMargins(0, 0, 0, 0)
-        tv.addWidget(label("Olay kayıtları", "h2"))
-        self.rec_table = QTableWidget()
-        self.rec_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        tv.addWidget(self.rec_table)
-        bottom = QWidget()
-        bv = QVBoxLayout(bottom)
-        bv.setContentsMargins(0, 0, 0, 0)
-        bv.addWidget(label("Kartın gönderdiği ayarlar ve sayaçlar", "h2"))
-        self.cnt_table = QTableWidget()
-        self.cnt_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        bv.addWidget(self.cnt_table)
-        split.addWidget(top)
-        split.addWidget(bottom)
-        split.setSizes([420, 260])
-        v.addWidget(split)
-        return page
 
     def _tab_run(self) -> QWidget:
         page = QWidget()
@@ -799,7 +741,7 @@ class LabWindow(QMainWindow):
         self.count_label = label("", "muted")
         self.press_label = label("", "press")
         self.msg_label = label("Kartı bağla, ayarları seç ve deneyi başlat. Sonuç soldaki listeye \"Bu oturum\" "
-                               "altında eklenir ve Özet sekmesinde açılır.", "muted", wrap=True)
+                               "altında eklenir ve Sonuç sekmesinde açılır.", "muted", wrap=True)
         for x in (self.phase_label, self.progress, self.count_label, self.press_label, self.msg_label):
             lv.addWidget(x)
         lv.addStretch(1)
@@ -817,14 +759,6 @@ class LabWindow(QMainWindow):
         self._fix_changed()
         self._set_run_controls(False)
         return scroll_page(page)
-
-    # ---- tema -----------------------------------------------------------------
-    def _toggle_theme(self):
-        global T
-        T = DARK if T is LIGHT else LIGHT
-        self.theme_btn.setText("Açık tema" if T is DARK else "Koyu tema")
-        QApplication.instance().setStyleSheet(qss(T))
-        self._fill_run_list(select=self.current_key)
 
     # ---- deney kontrolleri ------------------------------------------------
     def _apply_preset(self):
@@ -1018,9 +952,9 @@ class LabWindow(QMainWindow):
         self.compare_keys.add(run.key)
         self._fill_run_list(select=run.key)
         self._set_phase("IDLE")
-        self._say(f"Kayıtlar alındı ({run.stat()['n']} olay) ve Özet sekmesinde açıldı. Saklamak için soldan "
-                  "CSV ve ham oturumu kaydet.")
-        self.tabs.setCurrentIndex(self.TAB_SUMMARY)
+        self._say(f"Kayıtlar alındı ({run.stat()['n']} olay) ve Sonuç sekmesinde açıldı. Saklamak için soldan "
+                  "Kaydet'e bas.")
+        self.tabs.setCurrentIndex(self.TAB_RESULT)
 
     def _say(self, text: str, error: bool = False):
         self.msg_label.setText(text)
@@ -1073,8 +1007,8 @@ class LabWindow(QMainWindow):
         key = item.data(Qt.UserRole)
         if key:
             self._show_run(key)
-            if self.tabs.currentIndex() in (self.TAB_RUN, self.TAB_GUIDE):
-                self.tabs.setCurrentIndex(self.TAB_SUMMARY)
+            if self.tabs.currentIndex() == self.TAB_RUN:
+                self.tabs.setCurrentIndex(self.TAB_RESULT)
 
     def _cmp_checked(self, item: QListWidgetItem):
         key = item.data(Qt.UserRole)
@@ -1091,11 +1025,10 @@ class LabWindow(QMainWindow):
             return
         self.current_key = key
         st = run.stat()
-        self.chip_group.setText("resmi · standart tasarım" if run.official else run.group.lower())
-        self.chip_press.setText("otomatik basış" if run.inject else "elle basış")
-        self.chip_fix.setText(fix_label(run.fix) if run.fix else "çözüm yok")
         self.title.setText(run.label)
-        self.conditions.setText(run.conditions())
+        kind = "resmi ölçüm" if run.official else run.group.lower()
+        fix = fix_label(run.fix) if run.fix else "çözüm yok"
+        self.conditions.setText(f"{run.conditions()} · {fix} · {kind}")
         self.headline.setText(headline(run))
         bad = lambda cond: f"color:{T.critical};font-weight:700" if cond else f"color:{T.ink};font-weight:700"  # noqa: E731
         sep = f"<span style='color:{T.grid}'>&nbsp;&nbsp;|&nbsp;&nbsp;</span>"
@@ -1110,7 +1043,6 @@ class LabWindow(QMainWindow):
         self._fill_diag(run)
         self._fill_events(run)
         self._fill_records(run)
-        self._fill_counters(run)
 
     def _fill_diag(self, run: Run):
         lines = []
@@ -1135,22 +1067,24 @@ class LabWindow(QMainWindow):
 
     def _fill_events(self, run: Run):
         self._events = sorted(run.events, key=lambda e: (e.ok and not e.late, e.rec.event_id))
-        self.event_list.blockSignals(True)
-        self.event_list.clear()
+        self.event_box.blockSignals(True)
+        self.event_box.clear()
         for e in self._events:
             if not e.ok:
-                text, col = f"olay {e.rec.event_id:<3} ✕ yanıt yok", T.critical
+                text = f"olay {e.rec.event_id} · ✕ yanıt yok"
             elif e.late:
-                text, col = f"olay {e.rec.event_id:<3} {num(e.r_ms):>7} ms  aştı", T.critical
+                text = f"olay {e.rec.event_id} · {num(e.r_ms)} ms · aştı"
             else:
-                text, col = f"olay {e.rec.event_id:<3} {num(e.r_ms):>7} ms", T.ink2
-            it = QListWidgetItem(text)
-            it.setForeground(QColor(col))
-            it.setFont(QFont("Menlo", 11))
-            self.event_list.addItem(it)
-        self.event_list.blockSignals(False)
-        self.event_list.setCurrentRow(0)
+                text = f"olay {e.rec.event_id} · {num(e.r_ms)} ms"
+            self.event_box.addItem(text)
+        self.event_box.blockSignals(False)
+        self.event_box.setCurrentIndex(0)
         self._show_event(0)
+
+    def _pick_event(self, i: int):
+        """R grafiğinde tıklanan noktayı olay seçicide seç."""
+        ev = self.resp_chart.picked[i]
+        self.event_box.setCurrentIndex(self._events.index(ev))
 
     def _show_event(self, idx: int):
         run = self.current_run()
@@ -1181,21 +1115,6 @@ class LabWindow(QMainWindow):
                 t.setItem(i, j, it)
         t.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         t.horizontalHeader().setSectionResizeMode(len(cols) - 1, QHeaderView.Stretch)
-
-    def _fill_counters(self, run: Run):
-        rows = [("CFG", k, v) for k, v in run.cfg.items()] + [("CNT", k, v) for k, v in run.cnt.items()] + \
-               [("TSK", tk["name"], f"öncelik {tk.get('prio')} · {tk.get('stack_hwm_words')} word boş")
-                for tk in run.tasks]
-        t = self.cnt_table
-        t.setColumnCount(3)
-        t.setHorizontalHeaderLabels(["", "anahtar", "değer"])
-        t.setRowCount(max(1, len(rows)))
-        for i, row in enumerate(rows):
-            for j, val in enumerate(row):
-                t.setItem(i, j, QTableWidgetItem(str(val)))
-        if not rows:
-            t.setItem(0, 1, QTableWidgetItem("bu deneme için meta dosyası yok"))
-        t.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
     def _update_compare(self):
         runs = [r for r in self.runs if r.key in self.compare_keys]
@@ -1231,11 +1150,12 @@ class LabWindow(QMainWindow):
         self.runs.append(run)
         self._fill_run_list(select=run.key)
 
-    def _save_csv(self):
+    def _save(self):
+        """CSV (ödev formatı) + _meta.txt; bu oturumda kaydedildiyse ham UART baytları da."""
         run = self.current_run()
         if run is None:
             return
-        path, _ = QFileDialog.getSaveFileName(self, "CSV kaydet", f"{run.cfg.get('scenario', 'deneme')}.csv",
+        path, _ = QFileDialog.getSaveFileName(self, "Denemeyi kaydet", f"{run.cfg.get('scenario', 'deneme')}.csv",
                                               "CSV (*.csv)")
         if not path:
             return
@@ -1244,23 +1164,18 @@ class LabWindow(QMainWindow):
             w.writerow(CSV_HEADER)
             for e in run.events:
                 w.writerow([e.rec.scenario, e.rec.event_id, *["" if t is None else t for t in e.rec.t], e.rec.status])
-        meta = Path(path).with_name(Path(path).stem + "_meta.txt")
+        base = Path(path).with_suffix("")
+        meta = base.with_name(base.name + "_meta.txt")
         meta.write_text("\n".join([f"CFG,{k}={v}" for k, v in run.cfg.items()] +
                                   [f"CNT,{k}={v}" for k, v in run.cnt.items()] +
                                   [f"TSK,{t['name']},prio={t.get('prio')},stack_hwm_words={t.get('stack_hwm_words')}"
                                    for t in run.tasks]) + "\n")
-        QMessageBox.information(self, "RTOS Lab", f"{Path(path).name} ve {meta.name} kaydedildi.")
-
-    def _save_raw(self):
-        run = self.current_run()
-        if run is None or not run.raw:
-            QMessageBox.information(self, "RTOS Lab", "Ham baytlar yalnızca bu oturumda kaydedilen denemelerde var.")
-            return
-        path, _ = QFileDialog.getSaveFileName(self, "Ham oturumu kaydet",
-                                              f"{run.cfg.get('scenario', 'deneme')}_ham.bin", "Ham UART (*.bin)")
-        if path:
-            Path(path).write_bytes(run.raw)
-            QMessageBox.information(self, "RTOS Lab", f"Ham UART oturumu kaydedildi ({len(run.raw)} bayt).")
+        saved = [Path(path).name, meta.name]
+        if run.raw:
+            raw = base.with_name(base.name + "_raw.bin")
+            raw.write_bytes(run.raw)
+            saved.append(raw.name)
+        QMessageBox.information(self, "RTOS Lab", "Kaydedildi: " + ", ".join(saved))
 
     def closeEvent(self, ev):
         if self.reader:
