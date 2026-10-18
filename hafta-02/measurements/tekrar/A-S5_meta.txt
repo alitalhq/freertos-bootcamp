@@ -1,0 +1,17 @@
+CFG,scenario=A-S5,sysclk_hz=80000000,tick_hz=1000,timer_hz=1000000,baud=115200,freertos=V10.3.1,opt=O0
+CFG,period_ms=10,work_us=5000,target_events=35,warmup_ms=5000,debounce_us=30000,deadline_us=20000
+CFG,variant=A,burst=1,prio_tel=3,prio_btn=2,prio_tx=1
+CFG,msg_len=64,tx_pending_max=16,btn_first=0,btnq_len=8
+CFG,calib_iters=10000,calib_us=3884,work_iters=12873
+CFG,inject=0,gap_min_ms=500,gap_max_ms=1500,seed=1,run=25134,injected=0
+TSK,uart_tx,prio=1,stack_hwm_words=169
+TSK,IDLE,prio=0,stack_hwm_words=94
+TSK,telemetry,prio=3,stack_hwm_words=190
+TSK,button,prio=2,stack_hwm_words=186
+TSK,Tmr Svc,prio=2,stack_hwm_words=215
+CNT,accepted=35,bounce_rejected=0,ignored=0,btn_q_drop=0,buttonq_hwm=1,rec_overflow=0
+CNT,tel_sent=4659,tel_tx_drop=7,btn_tx_drop=13,msg_overflow=0,txq_hwm=16
+CNT,uart_tx_ok=4730,uart_start_err=0,uart_error=0,uart_timeout=0,free_heap=13024
+CNT,period_n=4665,period_min_us=9993,period_avg_us=9999,period_max_us=10003,work_n=4666,work_min_us=5022,work_avg_us=5052,work_max_us=5069
+CNT,tel_wait_n=4659,tel_wait_min_us=163,tel_wait_avg_us=79344,tel_wait_max_us=150134
+END
