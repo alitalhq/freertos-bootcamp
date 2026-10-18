@@ -25,7 +25,7 @@ Firmware: [`../firmware/odev02`](../firmware/odev02). Ödev 2 ile aynı proje; S
 | SystemView hedef kaynakları | SEGGERMicro/SystemView `92ca7a8`, SEGGERMicro/RTT `4d8feab` |
 | RTOS | FreeRTOS 10.3.1 + SEGGER `FreeRTOSV10_Core.patch` (yalnız CM4F'nin kullandığı dosyalar, `portmacro.h` hariç) |
 | Zaman damgası | DWT CYCCNT, 80 MHz (TIM2 ölçümlerinden ayrı saat) |
-| Ölçülen firmware commit'i | `ed4ba76` (`feat/hafta-02-systemview`) |
+| Ölçülen firmware commit'i | `6a27cf3` (main, [PR #8](https://github.com/alitalhq/freertos-bootcamp/pull/8)). Ölçümler PR dalındaki `ed4ba76` ile alındı; `git diff ed4ba76 6a27cf3 -- hafta-02/firmware` boş. |
 
 ## Nasıl tekrarlanır?
 

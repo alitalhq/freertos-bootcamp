@@ -95,7 +95,7 @@ python hafta-02/analysis/analyze.py hafta-02/measurements/tekrar   # tekrar öl�
 
 | | |
 |---|---|
-| Firmware commit'i | `492bc21`: [PR #2](https://github.com/alitalhq/freertos-bootcamp/pull/2) dalı. Main'deki squash commit aynı kaynağı içerir. |
+| Firmware commit'i | `7ad8acd` (main, [PR #2](https://github.com/alitalhq/freertos-bootcamp/pull/2)). Ölçümler PR dalındaki `492bc21` ile alındı; `git diff 492bc21 7ad8acd -- hafta-02/firmware` boş, yani firmware aynı. |
 | Kart | NUCLEO-L476RG, 80 MHz (HSI → PLL) |
 | Araçlar | STM32CubeIDE 2.2.0 (GNU Tools for STM32 14.3), STM32CubeMX 6.18.1, FW_L4 1.18.2 |
 | RTOS | FreeRTOS 10.3.1, CMSIS-RTOS v2, tick 1 kHz |
