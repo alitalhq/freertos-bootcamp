@@ -1,0 +1,12 @@
+{
+  "SystemView": {
+    "commit": "92ca7a810c5765ba64911919acd511c61b6b083f",
+    "url": "https://codeload.github.com/SEGGERMicro/SystemView/zip/92ca7a810c5765ba64911919acd511c61b6b083f",
+    "sha256": "15f993ff4616dbba8dd29d460b896a2e5f3e59d5e3ac6f76c6e8dfae308ed8a1"
+  },
+  "RTT": {
+    "commit": "4d8feab3150f86f37a9d323ddc88d6cdf5673072",
+    "url": "https://codeload.github.com/SEGGERMicro/RTT/zip/4d8feab3150f86f37a9d323ddc88d6cdf5673072",
+    "sha256": "06a55bf9af2debf5d58d2ae00d0f5582215630c87686e08d3c7c64acdfd834fe"
+  }
+}
