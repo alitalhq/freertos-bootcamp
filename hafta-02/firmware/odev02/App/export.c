@@ -68,7 +68,7 @@ static void export_cfg(void)
     kv(&b, "burst", sc->burst);
     kv(&b, "prio_tel", PRIO_TELEMETRY);
     kv(&b, "prio_btn", (sc->variant == 'A') ? PRIO_BUTTON_A : PRIO_BUTTON_BC);
-    kv(&b, "prio_tx", PRIO_UART_TX);
+    kv(&b, "prio_tx", sc->tx_prio ? sc->tx_prio : PRIO_UART_TX);
     send(&b);
 
     begin(&b, "CFG");

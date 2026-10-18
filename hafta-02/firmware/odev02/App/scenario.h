@@ -18,6 +18,7 @@ typedef struct {
     uint32_t seed;          /* otomatik aralıklar için sözde rastgele tohum */
     uint32_t run_id;        /* PC'nin verdiği deneme numarası */
     uint32_t trace;         /* 1 = SystemView kaydı açık (app_trace.h) */
+    uint32_t tx_prio;       /* UartTxTask önceliği; 0 = sürümün varsayılanı (1) */
 } RunConfig;
 
 /* app_init'te, kalibrasyondan önce çağrılır. */

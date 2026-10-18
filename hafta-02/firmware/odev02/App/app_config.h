@@ -19,7 +19,7 @@
 #define PRIO_TELEMETRY         3
 #define PRIO_BUTTON_A          2
 #define PRIO_BUTTON_BC         4
-#define PRIO_UART_TX           1
+#define PRIO_UART_TX           1     /* RUN txprio=N ile değiştirilebilir (iyileştirme deneyi) */
 
 /* ---- Stack boyutları (word = 4 bayt) ---------------------------------- */
 #define STACK_TELEMETRY        256

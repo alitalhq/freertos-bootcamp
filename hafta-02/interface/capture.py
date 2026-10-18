@@ -14,6 +14,7 @@ satırlarından dördüncü dosya yazılır (koşu adının sonuna 't' eklenir):
   python capture.py run --variant A --scenario S5 --inject auto
   python capture.py matrix --inject auto                       # A/B/C-S5, B/C-S6
   python capture.py run --variant B --scenario S6 --trace      # + SystemView kaydı
+  python capture.py run --variant B --scenario S5 --trace --tx-prio 4   # iyileştirme deneyi
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ from pathlib import Path
 
 import serial
 
-from protocol import ExportCollector, LineFramer, parse_line, write_export
+from protocol import MSG_LEN, ExportCollector, LineFramer, parse_line, write_export
 
 BAUD = 115200
 DEADLINE_MS = 20.0
@@ -47,17 +48,19 @@ def find_port() -> str | None:
     return ports[0] if ports else None
 
 
-def run_name(variant: str, scenario: str, inject: bool, trace: bool = False) -> str:
-    return f"{variant}-{scenario}" + ("a" if inject else "") + ("t" if trace else "")
+def run_name(variant: str, scenario: str, inject: bool, trace: bool = False, tx_prio: int = 0) -> str:
+    return (f"{variant}-{scenario}" + ("a" if inject else "") + ("t" if trace else "")
+            + (f"p{tx_prio}" if tx_prio else ""))
 
 
 def run_command(variant: str, scenario: str, inject: bool, target: int,
-                seed: int, run_id: int, gap_min: int, gap_max: int, trace: bool = False) -> str:
+                seed: int, run_id: int, gap_min: int, gap_max: int, trace: bool = False,
+                tx_prio: int = 0) -> str:
     period, burst, work = SCENARIOS[scenario]
-    return (f"RUN name={run_name(variant, scenario, inject, trace)} var={variant} "
+    return (f"RUN name={run_name(variant, scenario, inject, trace, tx_prio)} var={variant} "
             f"period={period} burst={burst} work={work} target={target} "
             f"inject={int(inject)} gmin={gap_min} gmax={gap_max} seed={seed} run={run_id} "
-            f"trace={int(trace)}\n")
+            f"trace={int(trace)} txprio={tx_prio}\n")
 
 
 def fnv1a(data: bytes) -> int:
@@ -105,6 +108,8 @@ class RunFilter:
     o yüzden bu koşunun adını taşıyan tam (64 bayt) satırlar LAB gelene kadar
     bekletilir. Kart TEL sırasını 0'dan başlatır: sıra geri giderse daha önce
     bekletilenler (aynı adı taşısa da) önceki koşuya aittir ve atılır.
+    Reset sırasında satır başına yapışan çöp baytlar kesilir (trim_reset_garbage);
+    koşu başladıktan sonraki satırlara dokunulmaz.
     """
 
     def __init__(self, name: str) -> None:
@@ -113,11 +118,27 @@ class RunFilter:
         self._pending: list[bytes] = []
         self._last_seq = -1
 
+    TAGS = (b"LAB,", b"TEL,", b"BTN,")
+
+    @classmethod
+    def trim_reset_garbage(cls, line_raw: bytes) -> bytes:
+        """Reset anında hatta düşen bayt(lar) bir sonraki satırın başına yapışır.
+        Satırın içinde tanınan bir etiket varsa ve oradan itibaren tam 64 bayt
+        kalıyorsa baştaki çöpü at; yoksa satırı olduğu gibi bırak."""
+        for tag in cls.TAGS:
+            at = line_raw.rfind(tag)
+            if at > 0 and len(line_raw) - at == MSG_LEN:
+                return line_raw[at:]
+        return line_raw
+
     def feed(self, line_raw: bytes, line) -> list[bytes]:
         if self.started:
             return [line_raw]
         if not line.length_ok:
-            return []
+            fixed = self.trim_reset_garbage(line_raw)
+            if fixed is line_raw:
+                return []
+            line_raw, line = fixed, parse_line(fixed)
         if line.kind == "TEL" and line.fields and line.fields[0].isdigit():
             seq = int(line.fields[0])
             if seq <= self._last_seq:
@@ -227,6 +248,8 @@ def main() -> int:
         p.add_argument("--timeout", type=float, default=900)
         p.add_argument("--overwrite", action="store_true")
         p.add_argument("--trace", action="store_true", help="record a SystemView trace (.SVDat)")
+        p.add_argument("--tx-prio", type=int, default=0,
+                       help="UartTxTask priority for the improvement experiment (0 = default 1)")
         if p.prog.endswith("run"):
             p.add_argument("--variant", choices=VARIANTS, required=True)
             p.add_argument("--scenario", choices=list(SCENARIOS), required=True)
@@ -239,9 +262,9 @@ def main() -> int:
     inject = a.inject == "auto"
     runs = [(a.variant, a.scenario)] if a.cmd == "run" else MATRIX
     for i, (variant, scenario) in enumerate(runs):
-        name = run_name(variant, scenario, inject, a.trace)
+        name = run_name(variant, scenario, inject, a.trace, a.tx_prio)
         cmd = run_command(variant, scenario, inject, a.target, a.seed + i,
-                          int(time.time()) % 100000, a.gap_min, a.gap_max, a.trace)
+                          int(time.time()) % 100000, a.gap_min, a.gap_max, a.trace, a.tx_prio)
         rc = capture(port, cmd, name, a.out, a.target, a.timeout, a.overwrite, a.trace)
         if rc != 0:
             return rc

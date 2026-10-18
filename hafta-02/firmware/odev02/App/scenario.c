@@ -42,6 +42,7 @@ void run_config_init(void)
     s_cfg.target = TARGET_EVENTS;
     s_cfg.inject = 0;
     s_cfg.trace = 0;
+    s_cfg.tx_prio = 0;
 
     /* PC'den RUN komutuyla gelen ayar varsa derleme varsayılanını ezer. */
     lab_load_config(&s_cfg);

@@ -208,8 +208,10 @@ void uart_tx_create(void)
     app_trace_name(s_items, "tx_items");
     s_btn_first = variant_btn_first(run_config());
 
+    /* SystemView iyileştirme deneyi: tek değişken olarak UART görev önceliği. */
+    const uint32_t prio = run_config()->tx_prio ? run_config()->tx_prio : PRIO_UART_TX;
     BaseType_t ok = xTaskCreate(UartTxTask, "uart_tx", STACK_UART_TX, NULL,
-                                PRIO_UART_TX, &s_task);
+                                (UBaseType_t)prio, &s_task);
     configASSERT(ok == pdPASS);
 }
 
