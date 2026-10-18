@@ -6,6 +6,7 @@
 #include "scenario.h"
 #include "workload.h"
 #include "lab.h"
+#include "app_trace.h"
 
 void app_init(void)
 {
@@ -13,6 +14,7 @@ void app_init(void)
        yazılmaz; UART'ın tek sahibi UartTxTask (R-TSK-2). */
     timebase_init();
     run_config_init();
+    app_trace_init();                     /* kayıt RUN trace=1 ise RUNNING'de başlar */
     workload_calibrate(run_config()->work_us);   /* R-WRK-3 */
 }
 

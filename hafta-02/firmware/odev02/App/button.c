@@ -9,6 +9,7 @@
 #include "msg.h"
 #include "stats.h"
 #include "uart_tx.h"
+#include "app_trace.h"
 
 #include "main.h"
 #include "FreeRTOS.h"
@@ -58,6 +59,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t pin)
     const uint32_t id = s_next_id++;
     g_stats.accepted++;
     records_open(id, now);
+    app_trace_event(TR_BTN_ACCEPT, id, 0);
     if (s_next_id >= run_config()->target)
     {
         g_exp_state = EXP_STOPPING;
@@ -100,6 +102,7 @@ void button_request_stop_from_isr(void)
 static void reply_to_event(const ButtonEvent *e, const RunConfig *sc)
 {
     records_stamp(e->id, T1, timer_us());
+    app_trace_event(TR_BTN_TASK, e->id, 0);
 
     TxMsg m;
     TextBuilder b;
@@ -120,6 +123,11 @@ static void reply_to_event(const ButtonEvent *e, const RunConfig *sc)
     {
         g_stats.btn_tx_drop++;
         records_set_status(e->id, ST_TX_DROP);
+        app_trace_event(TR_BTN_DROP, e->id, uart_tx_pending());
+    }
+    else
+    {
+        app_trace_event(TR_BTN_ENQUEUE, e->id, uart_tx_pending());
     }
 }
 
@@ -139,6 +147,7 @@ static void ButtonTask(void *arg)
     taskEXIT_CRITICAL();
     if (g_exp_state == EXP_RUNNING)
     {
+        app_trace_start();               /* trace=1: halka tampon kaydı başlar */
         HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
     }
 
@@ -171,6 +180,7 @@ void button_create(void)
 {
     s_button_q = xQueueCreate(BUTTON_QUEUE_LEN, sizeof(ButtonEvent));
     configASSERT(s_button_q != NULL);
+    app_trace_name(s_button_q, "button_q");
 
     /* A -> B: yalnızca ButtonTask önceliği değişir (2 -> 4). */
     const UBaseType_t prio = (run_config()->variant == 'A') ? PRIO_BUTTON_A : PRIO_BUTTON_BC;

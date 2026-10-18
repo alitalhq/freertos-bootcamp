@@ -94,6 +94,8 @@ static void build_lab_msg(TxMsg *m)
     tb_put_u32(&b, c->inject);
     tb_put_str(&b, ",N");
     tb_put_u32(&b, c->target);
+    tb_put_str(&b, ",T");
+    tb_put_u32(&b, c->trace);
     (void)msg_finish(&b);
 }
 
@@ -117,6 +119,7 @@ static void parse_run(char *args)
 {
     RunConfig c = *run_config();             /* belirtilmeyen alan eskisi kalır */
     c.run_id = 0;
+    c.trace = 0;
     for (char *tok = strtok(args, " "); tok != NULL; tok = strtok(NULL, " "))
     {
         char *eq = strchr(tok, '=');
@@ -135,6 +138,7 @@ static void parse_run(char *args)
         else if (!strcmp(k, "gmax"))   { c.gap_max_ms = parse_u32(v); }
         else if (!strcmp(k, "seed"))   { c.seed       = parse_u32(v); }
         else if (!strcmp(k, "run"))    { c.run_id     = parse_u32(v); }
+        else if (!strcmp(k, "trace"))  { c.trace      = parse_u32(v) ? 1U : 0U; }
     }
     store_and_reset(&c);                      /* dönmez */
 }

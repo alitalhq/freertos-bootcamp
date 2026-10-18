@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "button.h"
+#include "app_trace.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -167,10 +168,21 @@ void DebugMon_Handler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
+  /* SystemView: yalnız TC (mesaj sonu) kesmesi kaydedilir. Bayt başına gelen
+     TXE kesmeleri saniyede binlerce kayıt üretip tamponu doldururdu. */
+  const uint32_t trace_tc = (USART2->ISR & USART_ISR_TC) && (USART2->CR1 & USART_CR1_TCIE);
+  if (trace_tc)
+  {
+    app_trace_isr_enter();
+  }
 
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
+  if (trace_tc)
+  {
+    app_trace_isr_exit();
+  }
 
   /* USER CODE END USART2_IRQn 1 */
 }
@@ -182,10 +194,12 @@ void EXTI15_10_IRQHandler(void)
 {
   /* USER CODE BEGIN EXTI15_10_IRQn 0 */
   button_irq_entry();   /* t0: HAL dağıtımından önce (R-BTN-2) */
+  app_trace_isr_enter();
 
   /* USER CODE END EXTI15_10_IRQn 0 */
   HAL_GPIO_EXTI_IRQHandler(B1_Pin);
   /* USER CODE BEGIN EXTI15_10_IRQn 1 */
+  app_trace_isr_exit();
 
   /* USER CODE END EXTI15_10_IRQn 1 */
 }

@@ -9,6 +9,7 @@
 #include "stats.h"
 #include "scenario.h"
 #include "lab.h"
+#include "app_trace.h"
 
 #include "main.h"
 #include "usart.h"
@@ -55,6 +56,11 @@ bool uart_tx_post(TxMsg *m)
                      TX_PENDING_MAX - (uint32_t)uxSemaphoreGetCount(s_slots));
     (void)xSemaphoreGive(s_items);
     return true;
+}
+
+uint32_t uart_tx_pending(void)
+{
+    return TX_PENDING_MAX - (uint32_t)uxSemaphoreGetCount(s_slots);
 }
 
 void uart_tx_post_export(void)
@@ -116,6 +122,7 @@ static TxResult send_buf(uint16_t len, bool is_btn, uint32_t id)
     if (is_btn)
     {
         records_stamp(id, T3, timer_us());   /* UART başlatmadan hemen önce */
+        app_trace_event(TR_BTN_TX_START, id, 0);
     }
     if (HAL_UART_Transmit_IT(&huart2, s_tx_buf, len) != HAL_OK)
     {
@@ -155,8 +162,11 @@ static void UartTxTask(void *arg)
 
         if (m.type == MSG_CTRL_EXPORT)
         {
-            /* Bu işaretten önce kuyruğa giren tüm mesajlar gönderildi. */
+            /* Bu işaretten önce kuyruğa giren tüm mesajlar gönderildi. İz,
+               export trafiği kayda girmesin diye burada durur. */
+            app_trace_stop();
             export_all();
+            app_trace_export();
             g_exp_state = EXP_DONE;
             /* Askıya alınmıyor: PING yanıtı gibi mesajlar hâlâ gönderilebilsin. */
             continue;
@@ -192,6 +202,10 @@ void uart_tx_create(void)
     s_slots = xSemaphoreCreateCounting(TX_PENDING_MAX, TX_PENDING_MAX);
     s_items = xSemaphoreCreateCounting(TX_PENDING_MAX, 0);
     configASSERT(s_tx_q != NULL && s_urgent_q != NULL && s_slots != NULL && s_items != NULL);
+    app_trace_name(s_tx_q, "tx_q");
+    app_trace_name(s_urgent_q, "urgent_q");
+    app_trace_name(s_slots, "tx_slots");
+    app_trace_name(s_items, "tx_items");
     s_btn_first = variant_btn_first(run_config());
 
     BaseType_t ok = xTaskCreate(UartTxTask, "uart_tx", STACK_UART_TX, NULL,
@@ -213,6 +227,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
     {
         records_stamp(s_cur_id, T4, timer_us());
         records_set_status(s_cur_id, ST_OK);
+        app_trace_event(TR_BTN_TX_TC, s_cur_id, 0);
         s_cur_is_btn = false;
     }
     BaseType_t wake = pdFALSE;

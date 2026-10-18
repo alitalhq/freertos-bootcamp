@@ -93,6 +93,7 @@ static void export_cfg(void)
     kv(&b, "seed", sc->seed);
     kv(&b, "run", sc->run_id);
     kv(&b, "injected", lab_injected_count());
+    kv(&b, "trace", sc->trace);
     send(&b);
 }
 

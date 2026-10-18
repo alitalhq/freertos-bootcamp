@@ -5,11 +5,15 @@ seçilir. Her koşu için üç dosya yazılır:
   <ad>_raw.txt   UART'tan gelen her bayt, olduğu gibi (TEL/BTN/LAB/CFG/REC/CNT)
   <ad>.csv       REC satırları: t0..t4 ve durum
   <ad>_meta.txt  CFG/TSK/CNT satırları
+--trace ile kart SystemView kaydını da açar; END'den sonra gelen TRC/HEX
+satırlarından dördüncü dosya yazılır (koşu adının sonuna 't' eklenir):
+  <ad>.SVDat     SystemView kaydı (File → Open), son ~1–2 saniye
 
 Örnekler:
   python capture.py run --variant C --scenario S6              # fiziksel B1 basışları
   python capture.py run --variant A --scenario S5 --inject auto
   python capture.py matrix --inject auto                       # A/B/C-S5, B/C-S6
+  python capture.py run --variant B --scenario S6 --trace      # + SystemView kaydı
 """
 from __future__ import annotations
 
@@ -43,16 +47,55 @@ def find_port() -> str | None:
     return ports[0] if ports else None
 
 
-def run_name(variant: str, scenario: str, inject: bool) -> str:
-    return f"{variant}-{scenario}" + ("a" if inject else "")
+def run_name(variant: str, scenario: str, inject: bool, trace: bool = False) -> str:
+    return f"{variant}-{scenario}" + ("a" if inject else "") + ("t" if trace else "")
 
 
 def run_command(variant: str, scenario: str, inject: bool, target: int,
-                seed: int, run_id: int, gap_min: int, gap_max: int) -> str:
+                seed: int, run_id: int, gap_min: int, gap_max: int, trace: bool = False) -> str:
     period, burst, work = SCENARIOS[scenario]
-    return (f"RUN name={run_name(variant, scenario, inject)} var={variant} "
+    return (f"RUN name={run_name(variant, scenario, inject, trace)} var={variant} "
             f"period={period} burst={burst} work={work} target={target} "
-            f"inject={int(inject)} gmin={gap_min} gmax={gap_max} seed={seed} run={run_id}\n")
+            f"inject={int(inject)} gmin={gap_min} gmax={gap_max} seed={seed} run={run_id} "
+            f"trace={int(trace)}\n")
+
+
+def fnv1a(data: bytes) -> int:
+    h = 2166136261
+    for b in data:
+        h = ((h ^ b) * 16777619) & 0xFFFFFFFF
+    return h
+
+
+class TraceCollector:
+    """END'den sonra gelen SystemView kaydını toplar ve doğrular.
+
+    TRC,run=<id>,bytes=<n>,fnv=<u32>,wrapped=<0|1>
+    HEX,<offset>,<hex>     (sıralı, boşluksuz)
+    TRC_END
+    """
+
+    def __init__(self) -> None:
+        self.header: dict[str, str] = {}
+        self.header_line = ""
+        self.data = bytearray()
+        self.done = False
+
+    def feed(self, text: str) -> None:
+        if text.startswith("TRC,"):
+            self.header_line = text
+            self.header = dict(kv.split("=", 1) for kv in text.split(",")[1:] if "=" in kv)
+        elif text.startswith("HEX,"):
+            _, off, chunk = text.split(",", 2)
+            if int(off) != len(self.data):
+                raise ValueError(f"trace offset {off} != {len(self.data)}")
+            self.data += bytes.fromhex(chunk)
+        elif text == "TRC_END":
+            if len(self.data) != int(self.header["bytes"]):
+                raise ValueError(f"trace length {len(self.data)} != {self.header['bytes']}")
+            if fnv1a(self.data) != int(self.header["fnv"]):
+                raise ValueError("trace checksum mismatch")
+            self.done = True
 
 
 class RunFilter:
@@ -103,8 +146,9 @@ def summarize(exp) -> str:
 
 
 def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
-            timeout_s: float, overwrite: bool) -> int:
-    """RUN gönderir, END'e kadar her baytı kaydeder, CSV ve meta dosyalarını yazar."""
+            timeout_s: float, overwrite: bool, trace: bool = False) -> int:
+    """RUN gönderir, END'e (iz istendiyse TRC_END'e) kadar her baytı kaydeder,
+    CSV, meta ve varsa .SVDat dosyalarını yazar."""
     out_dir.mkdir(parents=True, exist_ok=True)
     raw_path = out_dir / f"{name}_raw.txt"
     if raw_path.exists() and not overwrite:
@@ -114,6 +158,8 @@ def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
     framer, col = LineFramer(), ExportCollector()
     raw = bytearray()
     run_filter = RunFilter(name)
+    trc = TraceCollector() if trace else None
+    exp = None
     btn = 0
     with serial.Serial(port, BAUD, timeout=0.1) as ser:
         ser.reset_input_buffer()
@@ -135,15 +181,30 @@ def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
                 elif line.kind == "BTN":
                     btn += 1
                     print(f"\rBTN {btn}/{target}", end="", flush=True)
-                exp = col.feed(line)
                 if exp is None:
+                    exp = col.feed(line)
+                    if exp is None:
+                        continue
+                    print()
+                    if trc:
+                        print("receiving SystemView trace…")
+                elif trc:
+                    trc.feed(line_raw.decode("ascii", errors="replace").strip())
+                if trc and not trc.done:
                     continue
-                print()
                 raw_path.write_bytes(bytes(raw))
                 exp.cfg["scenario"] = name   # dosya adı koşu adıyla aynı olsun
-                csv_path, _ = write_export(exp, out_dir, overwrite=overwrite)
+                csv_path, meta_path = write_export(exp, out_dir, overwrite=overwrite)
                 print(summarize(exp))
-                print(f"saved {raw_path.name}, {csv_path.name}, {name}_meta.txt")
+                saved = [raw_path.name, csv_path.name, meta_path.name]
+                if trc:
+                    sv = out_dir / f"{name}.SVDat"
+                    sv.write_bytes(bytes(trc.data))
+                    with meta_path.open("a") as f:
+                        f.write(trc.header_line + "\n")
+                    saved.append(sv.name)
+                    print(f"trace: {len(trc.data)} bytes, wrapped={trc.header.get('wrapped')}")
+                print("saved " + ", ".join(saved))
                 return 0
     raw_path.with_suffix(".partial.txt").write_bytes(bytes(raw))
     print("\ntimeout: END not received", file=sys.stderr)
@@ -165,6 +226,7 @@ def main() -> int:
         p.add_argument("--out", type=Path, default=DEFAULT_OUT)
         p.add_argument("--timeout", type=float, default=900)
         p.add_argument("--overwrite", action="store_true")
+        p.add_argument("--trace", action="store_true", help="record a SystemView trace (.SVDat)")
         if p.prog.endswith("run"):
             p.add_argument("--variant", choices=VARIANTS, required=True)
             p.add_argument("--scenario", choices=list(SCENARIOS), required=True)
@@ -177,10 +239,10 @@ def main() -> int:
     inject = a.inject == "auto"
     runs = [(a.variant, a.scenario)] if a.cmd == "run" else MATRIX
     for i, (variant, scenario) in enumerate(runs):
-        name = run_name(variant, scenario, inject)
+        name = run_name(variant, scenario, inject, a.trace)
         cmd = run_command(variant, scenario, inject, a.target, a.seed + i,
-                          int(time.time()) % 100000, a.gap_min, a.gap_max)
-        rc = capture(port, cmd, name, a.out, a.target, a.timeout, a.overwrite)
+                          int(time.time()) % 100000, a.gap_min, a.gap_max, a.trace)
+        rc = capture(port, cmd, name, a.out, a.target, a.timeout, a.overwrite, a.trace)
         if rc != 0:
             return rc
     return 0

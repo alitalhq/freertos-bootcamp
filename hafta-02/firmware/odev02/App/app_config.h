@@ -57,6 +57,6 @@
 /* ---- Otomatik basış (RUN inject=1) --------------------------------------
    EXTI13 yazılımla tetiklenir; gerçek basışla aynı ISR ve t0 noktası. */
 #define PRIO_INJECT            5       /* otomatik basış üreteci, her şeyin üstünde */
-#define STACK_INJECT           128
+#define STACK_INJECT           256     /* SystemView kaydı açıkken 128 taştı */
 
 #endif /* APP_CONFIG_H */
