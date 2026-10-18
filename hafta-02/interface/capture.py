@@ -55,6 +55,39 @@ def run_command(variant: str, scenario: str, inject: bool, target: int,
             f"inject={int(inject)} gmin={gap_min} gmax={gap_max} seed={seed} run={run_id}\n")
 
 
+class RunFilter:
+    """Ham oturuma yalnızca bu koşunun satırlarını alır.
+
+    RUN sonrası kart yeniden başlar. LAB satırı ilk TEL'lerden sonra gelebilir;
+    o yüzden bu koşunun adını taşıyan tam (64 bayt) satırlar LAB gelene kadar
+    bekletilir. Kart TEL sırasını 0'dan başlatır: sıra geri giderse daha önce
+    bekletilenler (aynı adı taşısa da) önceki koşuya aittir ve atılır.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.started = False
+        self._pending: list[bytes] = []
+        self._last_seq = -1
+
+    def feed(self, line_raw: bytes, line) -> list[bytes]:
+        if self.started:
+            return [line_raw]
+        if not line.length_ok:
+            return []
+        if line.kind == "TEL" and line.fields and line.fields[0].isdigit():
+            seq = int(line.fields[0])
+            if seq <= self._last_seq:
+                self._pending.clear()      # kart yeniden başladı
+            self._last_seq = seq
+        if len(line.fields) > 1 and line.fields[1] == self.name:
+            if line.kind == "LAB":
+                self.started = True
+                return self._pending + [line_raw]
+            self._pending.append(line_raw)
+        return []
+
+
 def summarize(exp) -> str:
     rs = [r.r_us / 1000 for r in exp.records if r.status == "ok" and r.r_us is not None]
     lost = sum(r.status != "ok" for r in exp.records)
@@ -80,8 +113,7 @@ def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
 
     framer, col = LineFramer(), ExportCollector()
     raw = bytearray()
-    started = False   # RUN sonrası yeniden başlayan kartın satırlarından itibaren kaydet
-    pending: list[bytes] = []
+    run_filter = RunFilter(name)
     btn = 0
     with serial.Serial(port, BAUD, timeout=0.1) as ser:
         ser.reset_input_buffer()
@@ -94,17 +126,10 @@ def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
                 continue
             for line_raw in framer.feed(data):
                 line = parse_line(line_raw)
-                if not started:
-                    # Kart LAB satırını ilk TEL'lerden sonra gönderebilir: bu
-                    # koşunun adını taşıyan satırları bekletip LAB gelince ekle.
-                    if len(line.fields) > 1 and line.fields[1] == name:
-                        pending.append(line_raw)
-                    if line.kind != "LAB" or not pending or pending[-1] is not line_raw:
-                        continue
-                    started = True
-                    for early in pending[:-1]:
-                        raw += early
-                raw += line_raw
+                for keep in run_filter.feed(line_raw, line):
+                    raw += keep
+                if not run_filter.started:
+                    continue
                 if line.kind == "LAB":
                     print("board:", line_raw.decode(errors="replace").rstrip())
                 elif line.kind == "BTN":
