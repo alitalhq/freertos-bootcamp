@@ -5,7 +5,7 @@
    tek derleme kullanılır: sürüm ve senaryo bu komutla seçilir.
 
    PC -> kart komutları (LF ile biten ASCII satırlar):
-     RUN name=C-S6 var=C period=100 burst=4 work=0 target=35 inject=1 gmin=500 gmax=1500 seed=7 run=12
+     RUN name=C-S6 var=C period=100 burst=4 work=0 target=35 inject=1 gmin=500 gmax=1500 seed=7 run=12 trace=1
          Ayarı SRAM2'ye yazar ve kartı yeniden başlatır: her deney temiz
          durumdan (boş kuyruklar, sıfır sayaçlar, yeni kalibrasyon) başlar.
      STOP     Deneyi hedef sayıya ulaşmadan bitirir ve export başlatır.

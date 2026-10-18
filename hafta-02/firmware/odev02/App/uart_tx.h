@@ -16,6 +16,9 @@ bool uart_tx_post(TxMsg *m);
 /* Deney sonu export işareti: tx_q'nun sonuna girer, yer açılana kadar bekler. */
 void uart_tx_post_export(void);
 
+/* Şu an gönderilmeyi bekleyen mesaj sayısı (iki kuyruk toplamı). */
+uint32_t uart_tx_pending(void);
+
 /* RX kesmesinden LAB yanıtı göndermek için. */
 void uart_tx_post_from_isr(TxMsg *m);
 

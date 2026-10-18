@@ -53,6 +53,7 @@ void lab_load_config(RunConfig *cfg)
     if (c.gap_max_ms < c.gap_min_ms)              { c.gap_max_ms = c.gap_min_ms; }
     if (c.variant != 'A' && c.variant != 'B' && c.variant != 'C') { return; }
     if (c.burst == 0U || c.burst > TX_PENDING_MAX) { c.burst = 1; }
+    if (c.tx_prio >= PRIO_INJECT)                  { c.tx_prio = 0; }
     *cfg = c;
 }
 
@@ -94,13 +95,15 @@ static void build_lab_msg(TxMsg *m)
     tb_put_u32(&b, c->inject);
     tb_put_str(&b, ",N");
     tb_put_u32(&b, c->target);
+    tb_put_str(&b, ",T");
+    tb_put_u32(&b, c->trace);
     (void)msg_finish(&b);
 }
 
 /* ---- Komut satırı ayrıştırma (USART2 RX kesmesi) ---------------------- */
 
 static uint8_t  s_rx_byte;
-static char     s_line[112];
+static char     s_line[192];       /* en uzun RUN satırı ~125 karakter */
 static uint32_t s_line_len;
 
 static uint32_t parse_u32(const char *s)
@@ -117,6 +120,8 @@ static void parse_run(char *args)
 {
     RunConfig c = *run_config();             /* belirtilmeyen alan eskisi kalır */
     c.run_id = 0;
+    c.trace = 0;
+    c.tx_prio = 0;
     for (char *tok = strtok(args, " "); tok != NULL; tok = strtok(NULL, " "))
     {
         char *eq = strchr(tok, '=');
@@ -135,6 +140,8 @@ static void parse_run(char *args)
         else if (!strcmp(k, "gmax"))   { c.gap_max_ms = parse_u32(v); }
         else if (!strcmp(k, "seed"))   { c.seed       = parse_u32(v); }
         else if (!strcmp(k, "run"))    { c.run_id     = parse_u32(v); }
+        else if (!strcmp(k, "trace"))  { c.trace      = parse_u32(v) ? 1U : 0U; }
+        else if (!strcmp(k, "txprio")) { c.tx_prio    = parse_u32(v); }
     }
     store_and_reset(&c);                      /* dönmez */
 }

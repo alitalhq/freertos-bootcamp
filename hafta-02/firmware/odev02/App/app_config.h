@@ -19,7 +19,7 @@
 #define PRIO_TELEMETRY         3
 #define PRIO_BUTTON_A          2
 #define PRIO_BUTTON_BC         4
-#define PRIO_UART_TX           1
+#define PRIO_UART_TX           1     /* RUN txprio=N ile değiştirilebilir (iyileştirme deneyi) */
 
 /* ---- Stack boyutları (word = 4 bayt) ---------------------------------- */
 #define STACK_TELEMETRY        256
@@ -57,6 +57,6 @@
 /* ---- Otomatik basış (RUN inject=1) --------------------------------------
    EXTI13 yazılımla tetiklenir; gerçek basışla aynı ISR ve t0 noktası. */
 #define PRIO_INJECT            5       /* otomatik basış üreteci, her şeyin üstünde */
-#define STACK_INJECT           128
+#define STACK_INJECT           256     /* SystemView kaydı açıkken 128 taştı */
 
 #endif /* APP_CONFIG_H */

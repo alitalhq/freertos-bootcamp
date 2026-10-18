@@ -167,6 +167,12 @@ standard names. */
 
 /* USER CODE BEGIN Defines */
 /* Section where parameter definitions can be added (for instance, to override default ones in FreeRTOS.h) */
+/* SystemView (SEGGER, FreeRTOS V10 örneği): görev listesi ve stack bilgisi
+   için gereken API'ler, ardından trace makroları. Kayıt yalnızca
+   app_trace_start() sonrası yapılır; öncesinde makrolar kayıt yazmaz. */
+#define INCLUDE_xTaskGetIdleTaskHandle       1
+#define INCLUDE_pxTaskGetStackStart          1
+#include "SEGGER_SYSVIEW_FreeRTOS.h"
 /* USER CODE END Defines */
 
 #endif /* FREERTOS_CONFIG_H */

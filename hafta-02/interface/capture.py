@@ -5,11 +5,16 @@ seçilir. Her koşu için üç dosya yazılır:
   <ad>_raw.txt   UART'tan gelen her bayt, olduğu gibi (TEL/BTN/LAB/CFG/REC/CNT)
   <ad>.csv       REC satırları: t0..t4 ve durum
   <ad>_meta.txt  CFG/TSK/CNT satırları
+--trace ile kart SystemView kaydını da açar; END'den sonra gelen TRC/HEX
+satırlarından dördüncü dosya yazılır (koşu adının sonuna 't' eklenir):
+  <ad>.SVDat     SystemView kaydı (File → Open), son ~1–2 saniye
 
 Örnekler:
   python capture.py run --variant C --scenario S6              # fiziksel B1 basışları
   python capture.py run --variant A --scenario S5 --inject auto
   python capture.py matrix --inject auto                       # A/B/C-S5, B/C-S6
+  python capture.py run --variant B --scenario S6 --trace      # + SystemView kaydı
+  python capture.py run --variant B --scenario S5 --trace --tx-prio 4   # iyileştirme deneyi
 """
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ from pathlib import Path
 
 import serial
 
-from protocol import ExportCollector, LineFramer, parse_line, write_export
+from protocol import MSG_LEN, ExportCollector, LineFramer, parse_line, write_export
 
 BAUD = 115200
 DEADLINE_MS = 20.0
@@ -43,16 +48,57 @@ def find_port() -> str | None:
     return ports[0] if ports else None
 
 
-def run_name(variant: str, scenario: str, inject: bool) -> str:
-    return f"{variant}-{scenario}" + ("a" if inject else "")
+def run_name(variant: str, scenario: str, inject: bool, trace: bool = False, tx_prio: int = 0) -> str:
+    return (f"{variant}-{scenario}" + ("a" if inject else "") + ("t" if trace else "")
+            + (f"p{tx_prio}" if tx_prio else ""))
 
 
 def run_command(variant: str, scenario: str, inject: bool, target: int,
-                seed: int, run_id: int, gap_min: int, gap_max: int) -> str:
+                seed: int, run_id: int, gap_min: int, gap_max: int, trace: bool = False,
+                tx_prio: int = 0) -> str:
     period, burst, work = SCENARIOS[scenario]
-    return (f"RUN name={run_name(variant, scenario, inject)} var={variant} "
+    return (f"RUN name={run_name(variant, scenario, inject, trace, tx_prio)} var={variant} "
             f"period={period} burst={burst} work={work} target={target} "
-            f"inject={int(inject)} gmin={gap_min} gmax={gap_max} seed={seed} run={run_id}\n")
+            f"inject={int(inject)} gmin={gap_min} gmax={gap_max} seed={seed} run={run_id} "
+            f"trace={int(trace)} txprio={tx_prio}\n")
+
+
+def fnv1a(data: bytes) -> int:
+    h = 2166136261
+    for b in data:
+        h = ((h ^ b) * 16777619) & 0xFFFFFFFF
+    return h
+
+
+class TraceCollector:
+    """END'den sonra gelen SystemView kaydını toplar ve doğrular.
+
+    TRC,run=<id>,bytes=<n>,fnv=<u32>,wrapped=<0|1>
+    HEX,<offset>,<hex>     (sıralı, boşluksuz)
+    TRC_END
+    """
+
+    def __init__(self) -> None:
+        self.header: dict[str, str] = {}
+        self.header_line = ""
+        self.data = bytearray()
+        self.done = False
+
+    def feed(self, text: str) -> None:
+        if text.startswith("TRC,"):
+            self.header_line = text
+            self.header = dict(kv.split("=", 1) for kv in text.split(",")[1:] if "=" in kv)
+        elif text.startswith("HEX,"):
+            _, off, chunk = text.split(",", 2)
+            if int(off) != len(self.data):
+                raise ValueError(f"trace offset {off} != {len(self.data)}")
+            self.data += bytes.fromhex(chunk)
+        elif text == "TRC_END":
+            if len(self.data) != int(self.header["bytes"]):
+                raise ValueError(f"trace length {len(self.data)} != {self.header['bytes']}")
+            if fnv1a(self.data) != int(self.header["fnv"]):
+                raise ValueError("trace checksum mismatch")
+            self.done = True
 
 
 class RunFilter:
@@ -62,6 +108,8 @@ class RunFilter:
     o yüzden bu koşunun adını taşıyan tam (64 bayt) satırlar LAB gelene kadar
     bekletilir. Kart TEL sırasını 0'dan başlatır: sıra geri giderse daha önce
     bekletilenler (aynı adı taşısa da) önceki koşuya aittir ve atılır.
+    Reset sırasında satır başına yapışan çöp baytlar kesilir (trim_reset_garbage);
+    koşu başladıktan sonraki satırlara dokunulmaz.
     """
 
     def __init__(self, name: str) -> None:
@@ -70,11 +118,27 @@ class RunFilter:
         self._pending: list[bytes] = []
         self._last_seq = -1
 
+    TAGS = (b"LAB,", b"TEL,", b"BTN,")
+
+    @classmethod
+    def trim_reset_garbage(cls, line_raw: bytes) -> bytes:
+        """Reset anında hatta düşen bayt(lar) bir sonraki satırın başına yapışır.
+        Satırın içinde tanınan bir etiket varsa ve oradan itibaren tam 64 bayt
+        kalıyorsa baştaki çöpü at; yoksa satırı olduğu gibi bırak."""
+        for tag in cls.TAGS:
+            at = line_raw.rfind(tag)
+            if at > 0 and len(line_raw) - at == MSG_LEN:
+                return line_raw[at:]
+        return line_raw
+
     def feed(self, line_raw: bytes, line) -> list[bytes]:
         if self.started:
             return [line_raw]
         if not line.length_ok:
-            return []
+            fixed = self.trim_reset_garbage(line_raw)
+            if fixed is line_raw:
+                return []
+            line_raw, line = fixed, parse_line(fixed)
         if line.kind == "TEL" and line.fields and line.fields[0].isdigit():
             seq = int(line.fields[0])
             if seq <= self._last_seq:
@@ -103,8 +167,9 @@ def summarize(exp) -> str:
 
 
 def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
-            timeout_s: float, overwrite: bool) -> int:
-    """RUN gönderir, END'e kadar her baytı kaydeder, CSV ve meta dosyalarını yazar."""
+            timeout_s: float, overwrite: bool, trace: bool = False) -> int:
+    """RUN gönderir, END'e (iz istendiyse TRC_END'e) kadar her baytı kaydeder,
+    CSV, meta ve varsa .SVDat dosyalarını yazar."""
     out_dir.mkdir(parents=True, exist_ok=True)
     raw_path = out_dir / f"{name}_raw.txt"
     if raw_path.exists() and not overwrite:
@@ -114,6 +179,8 @@ def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
     framer, col = LineFramer(), ExportCollector()
     raw = bytearray()
     run_filter = RunFilter(name)
+    trc = TraceCollector() if trace else None
+    exp = None
     btn = 0
     with serial.Serial(port, BAUD, timeout=0.1) as ser:
         ser.reset_input_buffer()
@@ -135,15 +202,30 @@ def capture(port: str, cmd: str, name: str, out_dir: Path, target: int,
                 elif line.kind == "BTN":
                     btn += 1
                     print(f"\rBTN {btn}/{target}", end="", flush=True)
-                exp = col.feed(line)
                 if exp is None:
+                    exp = col.feed(line)
+                    if exp is None:
+                        continue
+                    print()
+                    if trc:
+                        print("receiving SystemView trace…")
+                elif trc:
+                    trc.feed(line_raw.decode("ascii", errors="replace").strip())
+                if trc and not trc.done:
                     continue
-                print()
                 raw_path.write_bytes(bytes(raw))
                 exp.cfg["scenario"] = name   # dosya adı koşu adıyla aynı olsun
-                csv_path, _ = write_export(exp, out_dir, overwrite=overwrite)
+                csv_path, meta_path = write_export(exp, out_dir, overwrite=overwrite)
                 print(summarize(exp))
-                print(f"saved {raw_path.name}, {csv_path.name}, {name}_meta.txt")
+                saved = [raw_path.name, csv_path.name, meta_path.name]
+                if trc:
+                    sv = out_dir / f"{name}.SVDat"
+                    sv.write_bytes(bytes(trc.data))
+                    with meta_path.open("a") as f:
+                        f.write(trc.header_line + "\n")
+                    saved.append(sv.name)
+                    print(f"trace: {len(trc.data)} bytes, wrapped={trc.header.get('wrapped')}")
+                print("saved " + ", ".join(saved))
                 return 0
     raw_path.with_suffix(".partial.txt").write_bytes(bytes(raw))
     print("\ntimeout: END not received", file=sys.stderr)
@@ -165,6 +247,10 @@ def main() -> int:
         p.add_argument("--out", type=Path, default=DEFAULT_OUT)
         p.add_argument("--timeout", type=float, default=900)
         p.add_argument("--overwrite", action="store_true")
+        p.add_argument("--trace", action="store_true", help="record a SystemView trace (.SVDat)")
+        p.add_argument("--suffix", default="", help="extra run name suffix for repeat runs (e.g. 2)")
+        p.add_argument("--tx-prio", type=int, default=0,
+                       help="UartTxTask priority for the improvement experiment (0 = default 1)")
         if p.prog.endswith("run"):
             p.add_argument("--variant", choices=VARIANTS, required=True)
             p.add_argument("--scenario", choices=list(SCENARIOS), required=True)
@@ -177,10 +263,11 @@ def main() -> int:
     inject = a.inject == "auto"
     runs = [(a.variant, a.scenario)] if a.cmd == "run" else MATRIX
     for i, (variant, scenario) in enumerate(runs):
-        name = run_name(variant, scenario, inject)
+        name = run_name(variant, scenario, inject, a.trace, a.tx_prio) + a.suffix
         cmd = run_command(variant, scenario, inject, a.target, a.seed + i,
-                          int(time.time()) % 100000, a.gap_min, a.gap_max)
-        rc = capture(port, cmd, name, a.out, a.target, a.timeout, a.overwrite)
+                          int(time.time()) % 100000, a.gap_min, a.gap_max, a.trace, a.tx_prio)
+        cmd = cmd.replace(f"name={name[:len(name) - len(a.suffix)]} ", f"name={name} ", 1)
+        rc = capture(port, cmd, name, a.out, a.target, a.timeout, a.overwrite, a.trace)
         if rc != 0:
             return rc
     return 0

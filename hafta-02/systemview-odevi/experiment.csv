@@ -1,0 +1,14 @@
+run,run_id,condition,role,trace,prio_btn,prio_tx,presses,accepted,ok,trace_file,trace_full_t0_t4_ids,trace_dropped_ids,raw,csv,meta
+A-S5t,28108,A/S5,zorunlu koşul,1,2,1,B1 (elle),35,22,traces/A-S5t.SVDat,,34,measurements/A-S5t_raw.txt,measurements/A-S5t.csv,measurements/A-S5t_meta.txt
+A-S5t2,28495,A/S5,"zorunlu koşul, ek kısa kayıt",1,2,1,B1 (elle),20,16,traces/A-S5t2.SVDat,19,17 18,measurements/A-S5t2_raw.txt,measurements/A-S5t2.csv,measurements/A-S5t2_meta.txt
+A-S5t3,28543,A/S5,"zorunlu koşul, ek kısa kayıt",1,2,1,B1 (elle),20,16,traces/A-S5t3.SVDat,19,18,measurements/A-S5t3_raw.txt,measurements/A-S5t3.csv,measurements/A-S5t3_meta.txt
+A-S5t4,28571,A/S5,"zorunlu koşul, ek kısa kayıt",1,2,1,B1 (elle),20,14,traces/A-S5t4.SVDat,,17 18 19,measurements/A-S5t4_raw.txt,measurements/A-S5t4.csv,measurements/A-S5t4_meta.txt
+A-S5t5,28768,A/S5,"zorunlu koşul, ek kısa kayıt",1,2,1,B1 (elle),20,15,traces/A-S5t5.SVDat,18,17 19,measurements/A-S5t5_raw.txt,measurements/A-S5t5.csv,measurements/A-S5t5_meta.txt
+B-S5t,28157,B/S5,zorunlu koşul,1,4,1,B1 (elle),35,35,traces/B-S5t.SVDat,34,,measurements/B-S5t_raw.txt,measurements/B-S5t.csv,measurements/B-S5t_meta.txt
+B-S5t2,28597,B/S5,"zorunlu koşul, ek kısa kayıt",1,4,1,B1 (elle),20,20,traces/B-S5t2.SVDat,18 19,,measurements/B-S5t2_raw.txt,measurements/B-S5t2.csv,measurements/B-S5t2_meta.txt
+B-S5t3,28624,B/S5,"zorunlu koşul, ek kısa kayıt",1,4,1,B1 (elle),20,20,traces/B-S5t3.SVDat,18 19,,measurements/B-S5t3_raw.txt,measurements/B-S5t3.csv,measurements/B-S5t3_meta.txt
+B-S6t,28198,B/S6,zorunlu koşul,1,4,1,B1 (elle),35,35,traces/B-S6t.SVDat,33 34,,measurements/B-S6t_raw.txt,measurements/B-S6t.csv,measurements/B-S6t_meta.txt
+B-S6t2,28650,B/S6,"zorunlu koşul, ek kısa kayıt",1,4,1,B1 (elle),20,20,traces/B-S6t2.SVDat,16 17 18 19,,measurements/B-S6t2_raw.txt,measurements/B-S6t2.csv,measurements/B-S6t2_meta.txt
+C-S6t,28239,C/S6,zorunlu koşul,1,4,1,B1 (elle),35,35,traces/C-S6t.SVDat,32 33 34,,measurements/C-S6t_raw.txt,measurements/C-S6t.csv,measurements/C-S6t_meta.txt
+B-S5tp4,28278,B/S5,iyileştirme: UART önceliği 1→4 (önce: B/S5),1,4,4,B1 (elle),35,35,traces/B-S5tp4.SVDat,33 34,,measurements/B-S5tp4_raw.txt,measurements/B-S5tp4.csv,measurements/B-S5tp4_meta.txt
+C-S6,28316,C/S6,iz kapalı (karşılaştırma: C-S6t),0,4,1,B1 (elle),35,35,,,,measurements/C-S6_raw.txt,measurements/C-S6.csv,measurements/C-S6_meta.txt

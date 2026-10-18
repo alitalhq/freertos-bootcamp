@@ -1,0 +1,8 @@
+# SystemView açıklama dosyası: M=Odev2_BTN modülünün olayları (App/app_trace.c).
+# Numaralar modüle göredir (EventOffset 512 + n).
+0       BTN_ACCEPT                          id=%u
+1       BTN_TASK                            id=%u
+2       BTN_ENQUEUE                         id=%u pending=%u
+3       BTN_DROP                            id=%u pending=%u
+4       BTN_TX_START                        id=%u
+5       BTN_TX_TC                           id=%u
