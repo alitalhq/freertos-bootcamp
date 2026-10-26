@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hafta 5 Veri Hattı</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --mute:#667085; --line:#d9dde5; --ok:#147a3d; --bad:#b42318; --demo:#9a5b00; --acc:#2453c7; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171c; --card:#1d2128; --ink:#e7e9ee; --mute:#9aa3b2; --line:#30363f; --ok:#4ccf7e; --bad:#ff7b6e; --demo:#f0b44c; --acc:#7aa2ff; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--card); }
+  h1 { font-size:16px; margin:0 12px 0 0; }
+  main { display:grid; gap:12px; padding:12px 16px; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; }
+  h2 { font-size:13px; margin:0 0 8px; color:var(--mute); text-transform:uppercase; letter-spacing:.04em; }
+  button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.stop { border-color:var(--bad); color:var(--bad); font-weight:600; }
+  input { font:inherit; width:80px; padding:5px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+  .badge { padding:3px 8px; border-radius:99px; border:1px solid var(--line); font-weight:600; font-size:12px; }
+  .badge.hw { color:var(--ok); border-color:var(--ok); } .badge.demo { color:var(--demo); border-color:var(--demo); }
+  .state { font-size:22px; font-weight:700; } .run { color:var(--ok); } .stopped { color:var(--bad); }
+  #banner { padding:8px 16px; background:var(--card); border-bottom:1px solid var(--line); color:var(--demo); }
+  #banner:empty { display:none; }
+  table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  td { padding:3px 0; border-bottom:1px solid var(--line); } td:last-child { text-align:right; font-weight:600; }
+  .bar { height:10px; background:var(--bg); border:1px solid var(--line); border-radius:5px; overflow:hidden; margin:6px 0; }
+  .bar > div { height:100%; background:var(--acc); width:0; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:6px; }
+  #log { height:260px; overflow:auto; font:12px/1.4 ui-monospace, monospace; white-space:pre-wrap; word-break:break-all; }
+  .err { color:var(--bad); } .muted { color:var(--mute); font-size:12px; }
+  code { font-size:12px; word-break:break-all; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hafta 5 · UART veri hattı</h1>
+  <span id="mode" class="badge">Bağlı değil</span>
+  <button id="connect">Karta bağlan</button>
+  <button id="demo">Demo (tarayıcı modeli)</button>
+  <button id="disconnect" disabled>Bağlantıyı kes</button>
+  <span class="muted">Oturum: <b id="sid">—</b> · fw <b id="fw">—</b></span>
+</header>
+<div id="banner">Bağlantı yok. Gösterilen değerler güncel değil.</div>
+<main>
+  <section>
+    <h2>Durum</h2>
+    <div id="state" class="state">—</div>
+    <p class="muted">Son işlenen SEQ: <b id="lastSeq">—</b> · setpoint <b id="setpoint">—</b> · son snapshot <b id="snapAge">—</b></p>
+    <div class="row">
+      <button class="stop" data-cmd="STOP">STOP</button>
+      <button data-cmd="START">START</button>
+      <button data-cmd="SNAPSHOT">SNAPSHOT</button>
+      <label><input type="checkbox" id="auto" checked> 1 s'de bir snapshot</label>
+    </div>
+    <div class="row">
+      <input id="spValue" type="number" min="0" max="1000" value="500"><button data-cmd="SETPOINT">SETPOINT (0–1000)</button>
+    </div>
+    <div class="row">
+      <input id="stallMs" type="number" min="0" max="200" value="80"><button data-cmd="STALL_NEXT">STALL_NEXT ms (0–200)</button>
+    </div>
+    <p class="muted">Son gönderilen çerçeve: <code id="lastFrame">—</code></p>
+    <p id="ackState" class="muted"></p>
+  </section>
+  <section>
+    <h2>RX StreamBuffer</h2>
+    <div class="muted">Doluluk <b id="rem">—</b> / <b id="cap">—</b> B · tepe <b id="sbh">—</b> B · trigger <b id="trg">—</b></div>
+    <div class="bar"><div id="fill"></div></div>
+    <table>
+      <tr><td>ISR baytı = kabul + ret</td><td id="eq1">—</td></tr>
+      <tr><td>kabul = parser okuma + kalan</td><td id="eq2">—</td></tr>
+      <tr><td>Stream reddi (bayt)</td><td id="rej">—</td></tr>
+      <tr><td>CRC / uzunluk / başlık</td><td id="errs">—</td></tr>
+      <tr><td>Timeout (yarım çerçeve)</td><td id="to">—</td></tr>
+      <tr><td>SEQ boşluk / tekrar</td><td id="gap">—</td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>İş yolu</h2>
+    <table>
+      <tr><td>Kabul / ret</td><td id="jobs">—</td></tr>
+      <tr><td>Tamamlanan / iptal</td><td id="done">—</td></tr>
+      <tr><td>Kuyrukta / yürüyen / tepe</td><td id="jq">—</td></tr>
+      <tr><td>kabul = bitti + iptal + kuyruk + yürüyen</td><td id="eq3">—</td></tr>
+      <tr><td>Log satırı / düşen</td><td id="logs">—</td></tr>
+      <tr><td>STOP en çok (UART / buton)</td><td id="smax">—</td></tr>
+      <tr><td>Heap boş / en az</td><td id="heap">—</td></tr>
+    </table>
+  </section>
+  <section style="grid-column:1/-1">
+    <h2>Kayıt</h2>
+    <div class="row"><button id="jsonl">JSONL indir</button><button id="csv">CSV indir</button><span class="muted">Kart satırları ve gönderilen komutlar, tarayıcı zamanıyla. Kart ölçümü değildir.</span></div>
+    <div id="log"></div>
+  </section>
+</main>
+<script src="frame.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
